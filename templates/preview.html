@@ -74,18 +74,19 @@
                     <input type="hidden" name="fragment_needs_greeting" value="{{ '1' if not fragment_has_greeting else '0' }}">
                   {% endif %}
                   <input type="hidden" name="use_ai" value="0">
-                  <input type="hidden" name="ai_structure_only" value="1">
+
+                  <!-- Pass chosen template and optional event fields through to the send step -->
+                  <input type="hidden" name="template" value="{{ template if template else '' }}">
+                  <input type="hidden" name="cta_text" value="{{ cta_text if cta_text else '' }}">
+                  <input type="hidden" name="cta_link" value="{{ cta_link if cta_link else '' }}">
+                  <input type="hidden" name="event_date" value="{{ event_date if event_date else '' }}">
+                  <input type="hidden" name="event_time" value="{{ event_time if event_time else '' }}">
+                  <input type="hidden" name="event_location" value="{{ event_location if event_location else '' }}">
                 {% endif %}
 
-                <div class="form-check mt-2 mb-3">
-                  <input class="form-check-input" type="checkbox" value="1" id="dryRun" name="dry_run">
-                  <label class="form-check-label" for="dryRun">Dry run (do not send)</label>
-                </div>
-
-                <div class="mt-3 d-flex gap-2 align-items-center">
-                  <button id="sendBtn" class="btn btn-success" type="button">Send (5s)</button>
-                  <a class="btn btn-secondary" href="/">Back</a>
-                </div>
+                <!-- Pass any user-provided structure/css through as well -->
+                <input type="hidden" name="structure_html" value="{{ structure_html|e if structure_html else '' }}">
+                <input type="hidden" name="structure_css" value="{{ structure_css|e if structure_css else '' }}">
 
                 <hr />
                 <div class="mt-2">

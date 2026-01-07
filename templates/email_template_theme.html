@@ -1,0 +1,71 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{{ subject or 'Update from EduAI Hub' }}</title>
+    <style>
+      /* Simple, robust email-safe styles */
+      body{margin:0;padding:0;font-family:Arial,Helvetica,sans-serif;background:#ffffff;color:#000}
+      .container{width:100%;padding:0;background:#ffffff}
+      .box{width:600px;margin:0 auto;border:1px solid #e5e7eb}
+      .header{padding:16px;text-align:center}
+      .logo{display:block;margin:0 auto}
+      .warning{background-color:#d32f2f;color:#ffffff;padding:12px;font-weight:700;text-align:center}
+      .banner{background-color:#ffeb3b;color:#000;padding:14px;font-weight:700;text-align:center}
+      .content{padding:20px;font-size:14px;line-height:1.6;color:#000}
+      .title{font-size:20px;font-weight:900;text-align:center;padding:8px}
+      .eventbox{border:2px solid #000;padding:12px;text-align:center;margin:12px}
+      .ctaWrap{padding:20px;text-align:center}
+      .cta{background-color:#ffeb3b;color:#000;padding:14px 22px;border-radius:24px;text-decoration:none;display:inline-block;font-weight:700}
+      .reminder{padding:16px;font-size:13px;color:#000}
+      .green{background-color:#0a7a2f;color:#fff;padding:14px;text-align:center;font-weight:700}
+      .signature{padding:16px;font-size:13px}
+      .footer{background-color:#000;color:#fff;padding:12px;text-align:center;font-size:11px}
+      @media (max-width:620px){.box{width:100%} .title{font-size:18px} .content{padding:12px}}
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <table role="presentation" cellpadding="0" cellspacing="0" width="100%">
+        <tr><td align="center">
+          <table role="presentation" cellpadding="0" cellspacing="0" class="box">
+            <tr><td class="header">
+              <img src="{{ logo_url or 'https://via.placeholder.com/120x30?text=YOUR+LOGO' }}" alt="Logo" class="logo">
+            </td></tr>
+            <tr><td class="warning">{{ warning_text or '⚠️ WARNING' }}</td></tr>
+            <tr><td class="banner">{{ banner_text or 'Missing this 15-minute system costs you growth and revenue' }}</td></tr>
+            <tr><td class="content">
+              <p><strong>Hi {{ recipient_name or 'Educator' }},</strong></p>
+
+              <div style="margin:12px 0;">{{ ai_body|safe }}</div>
+
+              <div class="title">{{ title or subject or '' }}</div>
+
+            </td></tr>
+            <tr><td class="content">
+              <table role="presentation" cellpadding="0" cellspacing="0" width="100%">
+                <tr><td class="eventbox">
+                  <div style="font-weight:700;">{{ event_date or '📅 DATE' }} &nbsp; | &nbsp; {{ event_time or '🕔 TIME' }}</div>
+                  <div style="font-size:14px;padding-top:6px;color:#333;">{{ event_location or 'LIVE ON ZOOM' }}</div>
+                </td></tr>
+              </table>
+            </td></tr>
+            <tr><td class="ctaWrap">
+              <a href="{{ cta_link or '#' }}" class="cta">{{ cta_text or 'Register for tomorrow’s live session' }}</a>
+            </td></tr>
+            <tr><td class="reminder">
+              <p>{{ reminder_text or 'Sessions like this help founders cut daily chaos, build scalable systems, and avoid revenue leaks.' }}</p>
+              <p style="color:#d32f2f;font-weight:700;">{{ warning_remark or '⛔ This kind of growth isn’t optional — it’s survival in 2025.' }}</p>
+            </td></tr>
+            <tr><td class="green">{{ green_footer or 'Jumpstart growth — learn how in just 15 minutes' }}</td></tr>
+            <tr><td class="signature">
+              <p style="margin:0;">Warm regards,<br><strong>{{ sender_name or 'EduAI Hub Team' }}</strong></p>
+            </td></tr>
+            <tr><td class="footer">{{ footer_text or 'Solving complex business problems with intelligent automation solutions' }}</td></tr>
+          </table>
+        </td></tr>
+      </table>
+    </div>
+  </body>
+</html>

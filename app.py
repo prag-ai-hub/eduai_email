@@ -167,6 +167,68 @@ def stylize_marketing_body(raw_body: str, product_name: str | None = None) -> st
     return html
 
 
+def build_default_structure(fragment_html: str, subject: str = '', sender_name: str = '') -> tuple[str, str]:
+    """Return a (structure_html, structure_css) pair for the default email skeleton.
+
+    fragment_html: inner HTML (already wrapped with fragment styles if applicable)
+    subject, sender_name: used in header/footer
+    """
+    # More stylized, animated mobile-friendly skeleton
+    structure_css = (
+        "body{background-color:#eef2f6;margin:0;padding:0;-webkit-font-smoothing:antialiased;}"
+        "table.wrapper{max-width:680px;margin:28px auto;background:#ffffff;border-radius:12px;overflow:hidden;border:1px solid #e6e9ee;box-shadow:0 6px 30px rgba(37,53,70,0.06);}"
+        "td.header{background:linear-gradient(90deg,#2162a6,#2fc071);color:#fff;padding:20px;font-weight:800;font-size:20px;letter-spacing:0.2px}"
+        "td.hero{padding:14px;background:linear-gradient(180deg,rgba(255,255,255,0.02),transparent);text-align:center}"
+        "td.body{padding:20px;color:#23343a;font-size:15px;line-height:1.7;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif}"
+        "td.footer{padding:16px;font-size:12px;color:#7b7b7b;background:#fbfcfd;text-align:center}"
+        ".cta{display:inline-block;padding:10px 18px;background:linear-gradient(90deg,#ffb703,#ff7a18);color:#111827;border-radius:8px;text-decoration:none;font-weight:800;margin-top:16px;box-shadow:0 8px 20px rgba(255,122,24,0.18);transition:transform .18s ease,box-shadow .18s ease}"
+        ".cta:hover{transform:translateY(-2px);box-shadow:0 12px 28px rgba(34,60,80,0.12)}"
+        "@keyframes pulse{0%{transform:scale(1);opacity:1}50%{transform:scale(1.03);opacity:0.9}100%{transform:scale(1);opacity:1}}"
+        ".pulse{animation:pulse 3s infinite ease-in-out}"
+        ".divider{height:6px;background:linear-gradient(90deg,#1aa35a,#2fc071);border-radius:8px;margin:12px 0}"
+        ".ai-fragment h1,.ai-fragment h2{animation:fadeInDown .6s ease both}"
+        "@keyframes fadeInDown{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}"
+    )
+    # header shows subject/title and optional sender; include an optional animated GIF if configured
+    gif = os.environ.get('ANIMATED_GIF_URL')
+    gif_html = f"<img src=\"{gif}\" alt=\"\" width=76 style=\"vertical-align:middle;border-radius:8px;margin-left:12px;\"/>" if gif else ''
+    # Use inline styling fallbacks for higher email-client compatibility
+    header_inline = "background:linear-gradient(90deg,#ff7ab6,#4cc9f0);color:#ffffff;padding:20px;font-weight:900;font-size:20px;"
+    header_html = f"<td class=\"header\" style=\"{header_inline}\"><div style=\"display:flex;align-items:center;justify-content:space-between;gap:12px;\"><div>{subject or 'Update from EduAI'}</div><div>{gif_html}</div></div></td>"
+    footer_html = f"<td class=\"footer\" style=\"padding:16px;font-size:12px;color:#6b7280;background:#f8fbff;text-align:center\">{sender_name or 'EduAI Hub'} • <a href=\"https://eduaihub.in\">eduaihub.in</a></td>"
+    # include a subtle divider (inline) and leave the CTA up to the fragment, but add a placeholder wrapper
+    divider_inline = "height:8px;background:linear-gradient(90deg,#ff7ab6,#ffd166);border-radius:12px;margin:14px 0;display:block"
+    structure_html = (
+        "<table class=\"wrapper\" cellpadding=0 cellspacing=0 width=100%>"
+        f"<tr>{header_html}</tr>"
+        f"<tr><td class=\"hero\"><div class=\"divider pulse\" style=\"{divider_inline}\"></div></td></tr>"
+        f"<tr><td class=\"body\" style=\"padding:22px;color:#102a43;font-size:15px;line-height:1.75;background:linear-gradient(180deg,#ffffff,#fbfdff);\">{fragment_html}</td></tr>"
+        f"<tr>{footer_html}</tr>"
+        "</table>"
+    )
+    return structure_html, structure_css
+
+
+def normalize_fragment_html(content: str) -> str:
+    """Ensure fragment content is wrapped into block elements with inline fallbacks so styles apply.
+
+    - If the content already contains block-level HTML, wrap it in a container `div.ai-body-content`.
+    - Otherwise, split on blank lines and convert to <p> with inline paragraph styles.
+    """
+    if not content:
+        return ''
+    # If already has block-level elements, just wrap
+    if re.search(r'<\s*(p|div|ul|ol|table|h[1-6]|blockquote)\b', content, re.I):
+        return f"<div class=\"ai-body-content\">{content}</div>"
+
+    # Plain text: split on double newlines into paragraphs
+    paras = [p.strip() for p in re.split(r'\n{2,}|\r\n{2,}', content) if p.strip()]
+    if not paras:
+        paras = [content.strip()]
+    p_style = 'margin:0 0 12px 0;color:#1f3a5f;font-size:15px;line-height:1.7'
+    paras_html = ''.join([f"<p style=\"{p_style}\">" + p.replace('\n','<br/>') + "</p>" for p in paras])
+    return f"<div class=\"ai-body-content\">{paras_html}</div>"
+
 
 def has_meaningful_body(html_fragment: str, min_chars: int = 30, min_words: int = 5) -> bool:
     """Return True if the given HTML or fragment likely contains a meaningful message body.
@@ -356,8 +418,21 @@ def custom_send():
     files = request.files.getlist('files')
     ai_personalize = request.form.get('ai_personalize') == '1'
 
+    # Template selection and optional event details (defaults so they are always defined)
+    template_name = request.form.get('template') or ''
+    cta_text = request.form.get('cta_text') or ''
+    cta_link = request.form.get('cta_link') or ''
+    event_date = request.form.get('event_date') or ''
+    event_time = request.form.get('event_time') or ''
+    event_location = request.form.get('event_location') or ''
+
+    # Optional structure-only skeleton and user CSS
+    structure_html = request.form.get('structure_html') or ''
+    structure_css = request.form.get('structure_css') or ''
+
     # Early validation: require meaningful description content before processing
     if not description or not description.strip():
+
         flash('Please provide a message in the Description field.', 'warning')
         return redirect(request.url)
     # Check that description is not just a greeting
@@ -420,14 +495,41 @@ def custom_send():
         # use_ai flag kept for compatibility with downstream handlers; default it to False since we always use structure-only logic
         use_ai = False
 
+        # Prepare variables used by AI formatting
+        html_body = ''  # full HTML if AI returns a complete document
+        body_fragment = ''  # fallback fragment content
+
         # Run structure-only formatting (preserve wording, insert [[RECIPIENT_NAME]] placeholder in greetings)
         first = recipients[0]
         try:
-            subj_ret, rewritten = mcustom.rewrite_body(description, recipient_name='', product_name=product_name, product_pains=product_pains, structure_only=True)
-            # if user provided a subject override use it
-            user_subj = request.form.get('subject')
-            subj = user_subj if user_subj else (subj_ret or subj)
-            body_fragment = rewritten
+            # Prefer generating a full, stylized HTML email from OpenAI when available
+            if OPENAI_AVAILABLE:
+                try:
+                    subj_ai, full_html = mcustom.generate_full_html(description, subject=subj, recipient_name='', product_name=product_name, product_pains=product_pains)
+                    # If model provided a subject suggestion, adopt it unless user overrode
+                    user_subj = request.form.get('subject')
+                    subj = user_subj if user_subj else (subj_ai or subj)
+                    # Keep full_html as the preview email body
+                    body_fragment = ''
+                    # For preview, substitute the first recipient's name into the placeholder so the user sees a realistic preview
+                    try:
+                        preview_html = full_html.replace('[[RECIPIENT_NAME]]', first.get('name',''))
+                    except Exception:
+                        preview_html = full_html
+                    html_body = preview_html
+                    # remember the canonical AI html for sending (contains [[RECIPIENT_NAME]] placeholder)
+                    canonical_ai_html = full_html
+                except Exception:
+                    # fallback to structure-only formatting when full HTML generation fails
+                    subj_ret, rewritten = mcustom.rewrite_body(description, recipient_name='', product_name=product_name, product_pains=product_pains, structure_only=True)
+                    user_subj = request.form.get('subject')
+                    subj = user_subj if user_subj else (subj_ret or subj)
+                    body_fragment = rewritten
+            else:
+                subj_ret, rewritten = mcustom.rewrite_body(description, recipient_name='', product_name=product_name, product_pains=product_pains, structure_only=True)
+                user_subj = request.form.get('subject')
+                subj = user_subj if user_subj else (subj_ret or subj)
+                body_fragment = rewritten
         except Exception:
             subj = request.form.get('subject') or f'Update from EduAI Hub'
             body_fragment = stylize_marketing_body(description, product_name=product_name)
@@ -440,17 +542,62 @@ def custom_send():
         # For preview, show exactly what will be sent to the first recipient: inject greeting if needed
         first_name = first.get('name','')
         p_style = "margin:0 0 12px 0; font-size:15px; color:#234b38; line-height:1.6; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif"
+        fragment_style = "<style>.ai-fragment{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;font-size:15px;color:#1f3a5f;line-height:1.7;background:linear-gradient(180deg,#ffffff,#fbfdff);padding:10px;border-radius:10px}.ai-fragment p{margin:0 0 12px 0}.ai-fragment .lead{font-weight:900;color:#0b60a6;margin-bottom:8px;font-size:18px}.ai-fragment .cta-inline{display:inline-block;padding:10px 14px;background:linear-gradient(90deg,#ff7ab6,#6bdeff);color:#05233a;border-radius:10px;text-decoration:none;font-weight:900;box-shadow:0 10px 28px rgba(107,222,255,0.12);transition:transform .18s}.ai-fragment .cta-inline:hover{transform:translateY(-3px)}.ai-fragment .badge{display:inline-block;background:#ffd166;color:#6b3b00;padding:6px 8px;border-radius:999px;font-weight:900;margin-right:8px}.ai-decor{display:flex;justify-content:flex-end;gap:8px;margin-bottom:8px}.spark{display:inline-block;width:10px;height:10px;border-radius:50%;background:linear-gradient(90deg,#ff7ab6,#ffd166);box-shadow:0 8px 20px rgba(255,122,182,0.12);animation:confetti 3s linear infinite}@keyframes confetti{0%{transform:translateY(-4px) rotate(0);opacity:1}50%{transform:translateY(2px) rotate(180deg);opacity:0.8}100%{transform:translateY(-2px) rotate(360deg);opacity:0.3}}@keyframes fragBounce{0%{transform:translateY(-6px);opacity:0}60%{transform:translateY(3px);opacity:1}100%{transform:none}}.ai-fragment{animation:fragBounce .6s cubic-bezier(.17,.67,.3,1) both}.ai-body-content p{margin:0 0 12px 0;color:#102a43;font-size:15px;line-height:1.7}.ai-body-content h2{color:#ff7ab6;margin:0 0 8px 0}.ai-body-content ul li{margin:6px 0;padding-left:6px;color:#1f3a5f}.ai-body-content blockquote{border-left:4px solid #ffd166;padding:8px 12px;background:#fffaf0;color:#6b4a00;border-radius:6px}.ai-fragment .spark{width:10px;height:10px}@keyframes fragFadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}.ai-body-content p{animation:fragFadeIn .5s ease both}</style>"
+        def _wrap_fragment(content):
+            decor_html = "<div class='ai-decor'><span class='spark'></span><span class='spark'></span><span class='spark'></span></div>"
+            processed = normalize_fragment_html(content)
+            return fragment_style + f"<div class=\"ai-fragment\" style=\"padding:10px;border-radius:10px;background:linear-gradient(180deg,#ffffff,#fbfdff);\">{decor_html}{processed}</div>"
+
         if fragment_has_greeting:
-            fragment_preview = (body_fragment or '').replace('[[RECIPIENT_NAME]]', first_name)
+            frag = (body_fragment or '').replace('[[RECIPIENT_NAME]]', first_name)
         else:
-            greeting_html = f"<p style=\"{p_style}\">Hi {first_name or 'Valued Educator'},</p>"
-            fragment_preview = (greeting_html + (body_fragment or '')).replace('[[RECIPIENT_NAME]]', first_name)
+            greeting_html = f"<p style=\"{p_style}\">Hi {first_name or 'Educator'},</p>"
+            frag = (greeting_html + (body_fragment or '')).replace('[[RECIPIENT_NAME]]', first_name)
+        fragment_preview = _wrap_fragment(frag)
 
-        html_body = render_template('email_template_custom.html', recipient_name='', ai_hook='', ai_body=fragment_preview, suppress_greeting=True)
+        # Choose template: default or themed event template based on user selection
+        if 'html_body' not in locals() or not html_body:
+            template_name = request.form.get('template') or ''
+            # If user provided a custom structure skeleton, inject the AI fragment into it and include any user CSS
+            if structure_html:
+                # insert fragment_preview into the <td class="body"> ... </td> block if present; otherwise append
+                try:
+                    if re.search(r'(?is)<td[^>]*class=["\']body["\'][^>]*>.*?<\/td>', structure_html):
+                        # replace inner content
+                        html_with_body = re.sub(r'(?is)(<td[^>]*class=["\']body["\'][^>]*>).*?(<\/td>)', r"\1" + fragment_preview + r"\2", structure_html)
+                    elif '[[AI_BODY]]' in structure_html:
+                        html_with_body = structure_html.replace('[[AI_BODY]]', fragment_preview)
+                    else:
+                        html_with_body = structure_html.replace('</table>', f'<tr><td class="body">{fragment_preview}</td></tr></table>', 1)
+                except Exception:
+                    html_with_body = structure_html + fragment_preview
 
-        if PREMAILER_AVAILABLE:
-            # Inline CSS the same way we will for sends so preview matches final sent email
-            html_body = inline_css(html_body, keep_style_tags=False)
+                # wrap with head including any user CSS
+                head_css = f"<style>{structure_css}</style>" if structure_css else ''
+                html_body = f"<html><head>{head_css}</head><body>{html_with_body}</body></html>"
+            elif template_name == 'event':
+                # Gather optional event fields from the form (may be empty)
+                event_date = request.form.get('event_date') or ''
+                event_time = request.form.get('event_time') or ''
+                event_location = request.form.get('event_location') or 'LIVE ON ZOOM'
+                cta_text = request.form.get('cta_text') or 'Register for tomorrow\'s live session'
+                cta_link = request.form.get('cta_link') or '#'
+                html_body = render_template('email_template_theme.html', recipient_name=first_name, ai_body=fragment_preview, subject=subj, title=subj, event_date=event_date, event_time=event_time, event_location=event_location, cta_text=cta_text, cta_link=cta_link, sender_name=name)
+            else:
+                # If user did not provide a custom structure, build a default skeleton and include fragment styles/CSS
+                if not structure_html:
+                    generated_structure_html, generated_structure_css = build_default_structure(fragment_preview, subject=subj, sender_name=name)
+                    # prepare preview HTML with CSS in head so the browser shows styling
+                    html_body = f"<html><head><style>{generated_structure_css}</style></head><body>{generated_structure_html}</body></html>"
+                    # pass generated structure back so send task can reuse it
+                    structure_html = generated_structure_html
+                    structure_css = generated_structure_css
+                else:
+                    html_body = render_template('email_template_custom.html', recipient_name='', ai_hook='', ai_body=fragment_preview, suppress_greeting=True)
+
+        if PREMAILER_AVAILABLE and html_body:
+            # Preserve <style> blocks for the browser preview so animations and advanced styles are visible to the user.
+            html_body = inline_css(html_body, keep_style_tags=True)
         else:
             flash('Premailer not installed — styles may not appear in some email clients. Install with `pip install premailer`.', 'warning')
 
@@ -465,7 +612,7 @@ def custom_send():
 
         recipient_data = '\n'.join([f"{r['email']}||{r['name']}" for r in recipients])
 
-        return render_template('preview.html', emails=[r['email'] for r in recipients], count=len(recipients), subject=subj, sender_name=name, email_html=html_body, custom_attachments='||'.join(saved), custom_mode='custom', recipient_data=recipient_data, ai_personalize='1' if ai_personalize else '0', email_fragment=body_fragment, use_ai='1' if use_ai else '0', ai_structure_only='1' if use_ai_structure else '0')
+        return render_template('preview.html', emails=[r['email'] for r in recipients], count=len(recipients), subject=subj, sender_name=name, email_html=html_body, custom_attachments='||'.join(saved), custom_mode='custom', recipient_data=recipient_data, ai_personalize='1' if ai_personalize else '0', email_fragment=body_fragment, use_ai='1' if use_ai else '0', template=template_name, cta_text=cta_text if template_name=='event' else '', cta_link=cta_link if template_name=='event' else '', event_date=event_date if template_name=='event' else '', event_time=event_time if template_name=='event' else '', event_location=event_location if template_name=='event' else '', structure_html=structure_html, structure_css=structure_css)
     finally:
         # keep tempdirs for confirm step; cleanup after sending
         pass
@@ -538,7 +685,18 @@ def custom_start_send():
     # Read fragment_has_greeting and pass structure flag to the background send task
     fragment_has_greeting = request.form.get('fragment_has_greeting') == '1'
     use_ai_structure = True
-    thread = threading.Thread(target=send_custom_task, args=(task_id, recipients, subject, sender_name, attachments, email_html, ai_personalize, use_ai, use_ai_structure, description, email_fragment, fragment_has_greeting, product_key, product_name, product_pains), daemon=True)
+    template_name = request.form.get('template') or ''
+    cta_text = request.form.get('cta_text') or ''
+    cta_link = request.form.get('cta_link') or ''
+    event_date = request.form.get('event_date') or ''
+    event_time = request.form.get('event_time') or ''
+    event_location = request.form.get('event_location') or ''
+
+    # read structure HTML/CSS passed from preview (may be empty)
+    structure_html = request.form.get('structure_html') or ''
+    structure_css = request.form.get('structure_css') or ''
+
+    thread = threading.Thread(target=send_custom_task, args=(task_id, recipients, subject, sender_name, attachments, email_html, ai_personalize, use_ai, use_ai_structure, description, email_fragment, fragment_has_greeting, product_key, product_name, product_pains, template_name, cta_text, cta_link, event_date, event_time, event_location, structure_html, structure_css), daemon=True)
     thread.start()
     flash('Customized emails queued for sending (check progress).', 'success')
     return redirect(url_for('progress', task_id=task_id))
@@ -576,7 +734,7 @@ def send_preview():
     return redirect(request.referrer or url_for('dashboard'))
 
 
-def send_custom_task(task_id, recipients, subject, sender_display=None, attachments=None, body_html=None, ai_personalize=False, use_ai=False, use_ai_structure=False, description='', body_fragment='', fragment_has_greeting=False, product_key=None, product_name=None, product_pains=None):
+def send_custom_task(task_id, recipients, subject, sender_display=None, attachments=None, body_html=None, ai_personalize=False, use_ai=False, use_ai_structure=False, description='', body_fragment='', fragment_has_greeting=False, product_key=None, product_name=None, product_pains=None, template_name='', cta_text='', cta_link='', event_date='', event_time='', event_location='', structure_html='', structure_css=''):
     """Send emails using the EXACT preview HTML with per-recipient name personalization.
     
     The preview HTML (body_html) is the authoritative template. We personalize it per recipient
@@ -600,22 +758,65 @@ def send_custom_task(task_id, recipients, subject, sender_display=None, attachme
 
         # Prefer building the generic template from `body_fragment` (authoritative fragment used for preview)
         if body_fragment:
-            # If the fragment contains the placeholder token, replace it with our internal marker
-            if '[[RECIPIENT_NAME]]' in body_fragment:
-                frag_for_send = body_fragment.replace('[[RECIPIENT_NAME]]', greeting_marker)
-                suppress = True
-            elif not fragment_has_greeting and first_recipient_name:
-                # Inject a greeting that uses the marker (keeps same p_style used for preview)
-                frag_for_send = f"<p style=\"{p_style}\">Hi {greeting_marker},</p>" + body_fragment
-                suppress = True
-            else:
-                frag_for_send = body_fragment
-                suppress = fragment_has_greeting
-            # Render the full template from this fragment and fully inline CSS for sending
-            with app.app_context():
-                generic_html = render_template('email_template_custom.html', recipient_name='', ai_hook='', ai_body=frag_for_send, suppress_greeting=suppress)
+            # If user provided a structure_html skeleton, build a generic HTML from it that contains the greeting marker
+            if structure_html:
+                # Prepare a frag_for_send that uses the internal greeting marker
+                if '[[RECIPIENT_NAME]]' in body_fragment:
+                    frag_for_send = body_fragment.replace('[[RECIPIENT_NAME]]', greeting_marker)
+                elif not fragment_has_greeting and first_recipient_name:
+                    frag_for_send = f"<p style=\"{p_style}\">Hi {greeting_marker},</p>" + body_fragment
+                else:
+                    frag_for_send = body_fragment
+                # apply consistent fragment styles so content keeps its look when inserted into skeleton
+                fragment_style = "<style>.ai-fragment{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;font-size:15px;color:#1f3a5f;line-height:1.7;background:linear-gradient(180deg,#ffffff,#fbfdff);padding:6px;border-radius:8px}.ai-fragment p{margin:0 0 12px 0}.ai-fragment .lead{font-weight:900;color:#0b60a6;margin-bottom:8px;font-size:17px}.ai-fragment .cta-inline{display:inline-block;padding:10px 14px;background:linear-gradient(90deg,#ff7ab6,#6bdeff);color:#05233a;border-radius:10px;text-decoration:none;font-weight:900;box-shadow:0 10px 28px rgba(107,222,255,0.12);transition:transform .18s}.ai-fragment .cta-inline:hover{transform:translateY(-3px)}.ai-fragment .badge{display:inline-block;background:#ffd166;color:#6b3b00;padding:6px 8px;border-radius:999px;font-weight:900;margin-right:8px}.ai-decor{display:flex;justify-content:flex-end;gap:8px;margin-bottom:8px}.spark{display:inline-block;width:10px;height:10px;border-radius:50%;background:linear-gradient(90deg,#ff7ab6,#ffd166);box-shadow:0 8px 20px rgba(255,122,182,0.12);animation:confetti 3s linear infinite}@keyframes confetti{0%{transform:translateY(-4px) rotate(0);opacity:1}50%{transform:translateY(2px) rotate(180deg);opacity:0.8}100%{transform:translateY(-2px) rotate(360deg);opacity:0.3}}@keyframes fragFade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}</style>"
+                decor_html = "<div class='ai-decor'><span class='spark'></span><span class='spark'></span><span class='spark'></span></div>"
+                processed_frag = normalize_fragment_html(frag_for_send)
+                frag_for_send = fragment_style + f"<div class=\"ai-fragment\" style=\"padding:10px;border-radius:10px;background:linear-gradient(180deg,#ffffff,#fbfdff);\">{decor_html}{processed_frag}</div>"
+                # Inject fragment into structure_html
+                try:
+                    if re.search(r'(?is)<td[^>]*class=["\']body["\'][^>]*>.*?<\/td>', structure_html):
+                        generic_html = re.sub(r'(?is)(<td[^>]*class=["\']body["\'][^>]*>).*?(<\/td>)', r"\1" + frag_for_send + r"\2", structure_html)
+                    elif '[[AI_BODY]]' in structure_html:
+                        generic_html = structure_html.replace('[[AI_BODY]]', frag_for_send)
+                    else:
+                        generic_html = structure_html.replace('</table>', f'<tr><td class="body">{frag_for_send}</td></tr></table>', 1)
+                except Exception:
+                    generic_html = structure_html + frag_for_send
+                # include any user CSS
+                if structure_css:
+                    generic_html = f"<html><head><style>{structure_css}</style></head><body>{generic_html}</body></html>"
                 if PREMAILER_AVAILABLE:
                     generic_html = inline_css(generic_html, keep_style_tags=False)
+                suppress = True
+            else:
+                # If the fragment contains the placeholder token, replace it with our internal marker
+                if '[[RECIPIENT_NAME]]' in body_fragment:
+                    frag_for_send = body_fragment.replace('[[RECIPIENT_NAME]]', greeting_marker)
+                    suppress = True
+                elif not fragment_has_greeting and first_recipient_name:
+                    # Inject a greeting that uses the marker (keeps same p_style used for preview)
+                    frag_for_send = f"<p style=\"{p_style}\">Hi {greeting_marker},</p>" + body_fragment
+                    suppress = True
+                else:
+                    frag_for_send = body_fragment
+                    suppress = fragment_has_greeting
+                # apply consistent fragment styles so content keeps its look when rendered by the template
+                fragment_style = "<style>.ai-fragment{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;font-size:15px;color:#1f3a5f;line-height:1.7;background:linear-gradient(180deg,#ffffff,#fbfdff);padding:10px;border-radius:10px}.ai-fragment p{margin:0 0 12px 0}.ai-fragment .lead{font-weight:900;color:#0b60a6;margin-bottom:8px;font-size:17px}.ai-decor{display:flex;justify-content:flex-end;gap:8px;margin-bottom:8px}.spark{display:inline-block;width:10px;height:10px;border-radius:50%;background:linear-gradient(90deg,#ff7ab6,#ffd166);box-shadow:0 8px 20px rgba(255,122,182,0.12);animation:confetti 3s linear infinite}@keyframes confetti{0%{transform:translateY(-4px) rotate(0);opacity:1}50%{transform:translateY(2px) rotate(180deg);opacity:0.8}100%{transform:translateY(-2px) rotate(360deg);opacity:0.3}}@keyframes fragBounce{0%{transform:translateY(-6px);opacity:0}60%{transform:translateY(3px);opacity:1}100%{transform:none}}.ai-fragment{animation:fragBounce .6s cubic-bezier(.17,.67,.3,1) both}</style>"
+                decor_html = "<div class='ai-decor'><span class='spark'></span><span class='spark'></span><span class='spark'></span></div>"
+                processed_frag = normalize_fragment_html(frag_for_send)
+                frag_for_send = fragment_style + f"<div class=\"ai-fragment\" style=\"padding:10px;border-radius:10px;background:linear-gradient(180deg,#ffffff,#fbfdff);\">{decor_html}{processed_frag}</div>"
+                # Render the full template from this fragment and fully inline CSS for sending
+                with app.app_context():
+                    if template_name == 'event':
+                        generic_html = render_template('email_template_theme.html', recipient_name='', ai_body=frag_for_send, subject=subject, title=subject, event_date=event_date, event_time=event_time, event_location=event_location, cta_text=cta_text or 'Register', cta_link=cta_link or '#', sender_name=sender_display, footer_text='Solving complex business problems with intelligent automation solutions')
+                    elif not structure_html:
+                        # No user skeleton provided — build default skeleton on the backend and inline CSS for sending
+                        generated_structure_html, generated_structure_css = build_default_structure(frag_for_send, subject=subject, sender_name=sender_display)
+                        generic_html = f"<html><head><style>{generated_structure_css}</style></head><body>{generated_structure_html}</body></html>"
+                    else:
+                        generic_html = render_template('email_template_custom.html', recipient_name='', ai_hook='', ai_body=frag_for_send, suppress_greeting=suppress)
+                    if PREMAILER_AVAILABLE:
+                        generic_html = inline_css(generic_html, keep_style_tags=False)
         elif body_html:
             # Fallback: try to produce a generic version by replacing the first recipient's name if present
             generic_html = body_html
@@ -633,8 +834,10 @@ def send_custom_task(task_id, recipients, subject, sender_display=None, attachme
 
         for r in recipients:
             email = r.get('email')
-            name = r.get('name') or 'Valued Educator'
+            name = r.get('name') or 'Educator'
             try:
+                # Ensure any [[RECIPIENT_NAME]] placeholders are converted to our internal marker
+                generic_html = generic_html.replace('[[RECIPIENT_NAME]]', greeting_marker)
                 # Personalize the generic HTML for this recipient
                 final_html = generic_html.replace(greeting_marker, name)
                 use_subj = subject
@@ -854,7 +1057,7 @@ def greetings_send():
         # Build recipient_data hidden payload (email||name per line)
         recipient_data = '\n'.join([f"{r['email']}||{r['name']}" for r in recipients])
 
-        return render_template('preview.html', emails=[r['email'] for r in recipients], count=len(recipients), subject=subject, sender_name='EduAI', email_html=body_html, greeting_mode='greeting', greeting_kind=kind, custom_attachments='||'.join(attach_paths), recipient_data=recipient_data, email_fragment=body_fragment)
+        return render_template('preview.html', emails=[r['email'] for r in recipients], count=len(recipients), subject=subject, sender_name='EduAI', email_html=body_html, greeting_mode='greeting', greeting_kind=kind, custom_attachments='||'.join(attach_paths), recipient_data=recipient_data, email_fragment=body_fragment, structure_html='', structure_css='')
     finally:
         # Note: we keep attach_tmp and tempdir alive for the confirm step; they will be cleaned up after sending
         pass
@@ -1022,7 +1225,7 @@ def index():
             email_html = inline_css(email_html, keep_style_tags=True)
         else:
             flash('Premailer not installed — styles may not appear in some email clients. Install with `pip install premailer`.', 'warning')
-        return render_template('preview.html', emails=emails, count=len(emails), subject=subject, sender_name=sender_name or '', email_html=email_html, intro=intro)    
+        return render_template('preview.html', emails=emails, count=len(emails), subject=subject, sender_name=sender_name or '', email_html=email_html, intro=intro, structure_html='', structure_css='')    
     return render_template('index.html')
 
 
@@ -1127,7 +1330,7 @@ def product_sender():
             email_html = inline_css(email_html, keep_style_tags=True)
         else:
             flash('Premailer not installed — styles may not appear in some email clients. Install with `pip install premailer`.', 'warning')
-        return render_template('preview.html', emails=emails, count=len(emails), subject=subject, sender_name=sender_name or '', email_html=email_html, product_key=product_key, custom_note=custom_note, product_name=product['name'])
+        return render_template('preview.html', emails=emails, count=len(emails), subject=subject, sender_name=sender_name or '', email_html=email_html, product_key=product_key, custom_note=custom_note, product_name=product['name'], structure_html='', structure_css='')
     return render_template('product_send.html')
 
 

@@ -25,7 +25,7 @@ def generate_custom_email(recipient_name, description, product_name=None, produc
         f"You are a professional marketing copywriter for {company_name}.\n"
         f"Use a pain-first marketing approach: start by describing the key problems or pain points the recipient faces (use the product pains if provided), then present the product benefits as direct solutions to those problems.\n"
         f"Produce a short subject line (one sentence), a one-line compelling hook (ideally pain-oriented), and an HTML body section (no full html page) suitable to embed into an existing email template.\n"
-        f"Recipient name: {recipient_name if recipient_name else 'Valued Educator'}.\n"
+        f"Recipient name: {recipient_name if recipient_name else 'Educator'}.\n"
         f"{pains_text}\n"
         f"Context / description: {description}\n"
         "Respond with the format:\nSubject: <subject>\nHook: <short hook>\nBody:\n<html>...</html>\n"
@@ -100,6 +100,63 @@ def generate_custom_email(recipient_name, description, product_name=None, produc
 
     # Return subject, cleaned HTML fragment and hook (caller will render it into the full template)
     return subject, body_html, hook
+
+
+def generate_full_html(raw_body: str, subject: str | None = None, recipient_name: str = '', product_name: str | None = None, product_pains=None, company_name='EduAIHub') -> tuple:
+    """Ask OpenAI to return a full, stylized HTML email (complete <html> doc).
+
+    - Preserves the user's wording and meaning (do NOT paraphrase).
+    - Wraps content in an email-friendly template (table-based), includes <style> blocks and inline-friendly CSS.
+    - Replaces any recipient greeting name with [[RECIPIENT_NAME]] so personalization works.
+    Returns (subject_suggested_or_given, full_html_document)
+    """
+    if not openai or not getattr(openai, 'api_key', None):
+        raise RuntimeError('OpenAI is not available; set OPENAI_API_KEY and install the openai package to use AI features')
+
+    pains_text = ''
+    if product_name and product_pains:
+        pains_text = f"Product: {product_name}. Known pains: {', '.join(product_pains)}."
+
+    prompt = (
+        f"You are an expert email designer and formatter for {company_name}.\n"
+        "Do NOT change the user's words or meaning — only format and wrap the content into a complete, responsive HTML email suitable for educational audiences (teachers, school staff).\n"
+        "Requirements:\n"
+        " - Produce a full HTML document (<html>...</html>) with a table-based email-friendly layout and a <style> block for visual polish.\n"
+        " - Add inline styles to primary elements when practical (buttons, main sections), so the email degrades gracefully when <style> is stripped.\n"
+        " - Use bright, school-themed colors and playful but professional animations (simple keyframes), but keep animations subtle and non-intrusive.\n"
+        " - Replace any recipient names in greetings with the exact token [[RECIPIENT_NAME]] so the sending code can personalize per recipient.\n"
+        " - Keep links and images exactly as provided. Do not add external images unless included in the original text.\n"
+        f"Recipient name: {recipient_name if recipient_name else 'Educator'}. {pains_text}\n"
+        "Original content (do not paraphrase):\n" + raw_body + "\n"
+        "Respond with only the full HTML document. Do not include any commentary or markdown fences.\n"
+    )
+
+    def _chat_complete(messages, model='gpt-3.5-turbo', **kwargs):
+        try:
+            return openai.ChatCompletion.create(model=model, messages=messages, **kwargs)
+        except Exception:
+            return openai.chat.completions.create(model=model, messages=messages, **kwargs)
+
+    resp = _chat_complete([{'role': 'system', 'content': 'You produce clean HTML emails.'}, {'role': 'user', 'content': prompt}], max_tokens=800, temperature=0.35)
+    text = resp.choices[0].message.content.strip()
+
+    # If model returned subject line at top, pull it out
+    subj_out = subject or ''
+    lines = text.splitlines()
+    if lines and lines[0].lower().startswith('subject:'):
+        subj_out = lines[0].split(':', 1)[1].strip()
+        html_text = '\n'.join(lines[1:]).strip()
+    else:
+        html_text = text
+
+    # Heuristic cleanup: remove leading/trailing instruction echoes
+    html_text = re.sub(r'(?i)^```html\s*', '', html_text)
+    html_text = re.sub(r'(?i)```\s*$', '', html_text)
+
+    # Ensure recipient placeholder exists
+    html_text = re.sub(r'(?im)(^\s*(hi|hello|dear)\s+)([^\n,]{1,80})(,?)', lambda m: f"{m.group(1)}[[RECIPIENT_NAME]]{m.group(4) or ','}", html_text)
+
+    return subj_out, html_text
 
 
 def rewrite_body(raw_body: str, recipient_name: str = '', product_name: str | None = None, product_pains=None, company_name='EduAIHub', structure_only: bool = False) -> tuple:
@@ -195,7 +252,7 @@ def rewrite_body(raw_body: str, recipient_name: str = '', product_name: str | No
         f"You are a professional marketing copywriter for {company_name}.\n"
         "Rewrite the following message into a concise, pain-first marketing email body suitable to embed into an existing email template. "
         "Start with a short, bold problem statement (one sentence), then 1-2 short paragraphs describing benefits and a single clear call to action. Keep paragraphs short, suitable for email. Preserve any links provided. Output only a subject line then the HTML fragment.\n"
-        f"Recipient name: {recipient_name if recipient_name else 'Valued Educator'}.\n"
+        f"Recipient name: {recipient_name if recipient_name else 'Educator'}.\n"
         f"{pains_text}\n"
         "Original content:\n" + raw_body + "\n"
         "Respond with the format:\nSubject: <subject>\nBody:\n<html>...</html>\n"

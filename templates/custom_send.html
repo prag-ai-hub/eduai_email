@@ -41,12 +41,56 @@
           <label class="form-label">Subject (optional — if provided, used for all recipients)</label>
           <input class="form-control" name="subject" placeholder="Subject for all recipients (optional)">
         </div>
+
+        <div class="mb-3 form-check">
+          <input class="form-check-input" type="checkbox" id="useEvent" name="template" value="event">
+          <label class="form-check-label" for="useEvent">Use Event-themed template</label>
+          <div class="form-text">Toggles the event-style layout (banner, event box, CTA).</div>
+        </div>
+
+        <div id="eventFields" style="display:none;"> 
+          <div class="mb-3">
+            <label class="form-label">Event Date</label>
+            <input class="form-control" name="event_date" placeholder="05 SEP 2025">
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Event Time</label>
+            <input class="form-control" name="event_time" placeholder="5 PM IST">
+          </div>
+          <div class="mb-3">
+            <label class="form-label">CTA Text</label>
+            <input class="form-control" name="cta_text" placeholder="Register for tomorrow's live session">
+          </div>
+          <div class="mb-3">
+            <label class="form-label">CTA Link</label>
+            <input class="form-control" name="cta_link" placeholder="#">
+          </div>
+        </div>
+
+
+
         <div class="mb-3">
           <label class="form-label">Attachments (images, pdfs) — optional</label>
           <input class="form-control" type="file" name="files" multiple>
         </div>
         <button class="btn btn-primary" type="submit">Generate & Send</button>
         <a class="btn btn-secondary" href="/">Back</a>
+
+        <script>
+          (function(){
+            var cb = document.getElementById('useEvent');
+            var evt = document.getElementById('eventFields');
+            cb.addEventListener('change', function(){ evt.style.display = cb.checked ? 'block' : 'none'; });
+          })();
+        </script>
+
+        <script>
+          (function(){
+            var cb = document.getElementById('useEvent');
+            var evt = document.getElementById('eventFields');
+            cb.addEventListener('change', function(){ evt.style.display = cb.checked ? 'block' : 'none'; });
+          })();
+        </script>
       </form>
     </div>
   </body>

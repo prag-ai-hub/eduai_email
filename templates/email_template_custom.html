@@ -4,19 +4,24 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <style>
-      :root{--accent-1:#f5d84c;--accent-2:#2fc071}
+      /* Simplified, inline-friendly theme for broad email client support */
       body{margin:0;padding:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;background:#f4faf3;color:#15362b}
-      .wrap{width:100%;padding:24px 0;background:#f4faf3}
-      .card{max-width:720px;margin:0 auto;background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 8px 24px rgba(14,28,18,0.06)}
-      .header{background:linear-gradient(90deg,var(--accent-1),var(--accent-2));padding:22px 18px;color:#08331f}
+      .wrap{width:100%;padding:18px 0;background:#f4faf3}
+      .card{max-width:720px;margin:0 auto;background:#ffffff;border-radius:10px;overflow:hidden;box-shadow:0 6px 18px rgba(14,28,18,0.06)}
+      /* Use a solid accent color (safer for inlining) and avoid CSS variables/gradients */
+      .header{background-color:#2fc071;padding:18px;color:#ffffff}
       .brand{font-size:20px;font-weight:800;margin:0}
+      .tagline{margin:6px 0 0 0;color:#ffffff;opacity:0.95;font-size:13px}
+      .hero{background:#e7f7ef;padding:14px;border-top:4px solid rgba(47,192,113,0.18)}
       .content{padding:20px}
       .greet{margin:0 0 12px 0;color:#113826}
-      .hook{font-size:20px;font-weight:800;color:#0b3b26;margin:0 0 12px}
+      .hook{font-size:18px;font-weight:800;color:#0b3b26;margin:0 0 12px}
       .body{text-align:left;color:#234b38;line-height:1.6}
+      .highlight{background-color:#fff9d6;border-left:4px solid #f5d84c;padding:12px;border-radius:6px;color:#2f3b1f;font-weight:700;margin:0 0 12px}
+      .cta{display:inline-block;padding:10px 14px;background:#1aa35a;color:#ffffff;text-decoration:none;border-radius:6px;font-weight:700}
       .footer{background:#fbfbf9;padding:14px 18px;color:#5b675a;font-size:13px}
 
-      @media (max-width:600px){.header{text-align:center}.hook{font-size:18px}}
+      @media (max-width:600px){.header{text-align:center}.hook{font-size:16px}.content{padding:12px}}
     </style>
   </head>
   <body>
@@ -24,24 +29,25 @@
       <div class="card">
         <div class="header">
           <p class="brand">EduAI Hub</p>
-          <p style="margin:6px 0 0 0;color:#6a7466;font-size:13px">Where education meets Intelligence</p>
+          <p class="tagline">Where education meets Intelligence</p>
+        </div>
+        <div class="hero">
+          <!-- small hero strip for theme & context -->
+          <p style="margin:0;font-size:14px;color:#0b3b26;font-weight:700">Practical AI tools & classroom-ready features</p>
         </div>
         <div class="content">
           {% if not suppress_greeting %}
-            {% if recipient_name %}
-              <p class="greet">Hi {{ recipient_name }},</p>
-            {% else %}
-              <p class="greet">Hello,</p>
-            {% endif %}
+            <p class="greet">Hi {{ recipient_name or 'Educator' }},</p>
           {% endif %}
 
           {% if ai_hook %}
-            <div style="background-color:#fff9d6;border-left:4px solid #f5d84c;padding:12px;border-radius:6px;color:#2f3b1f;font-weight:700;margin:0 0 12px;">{{ ai_hook }}</div>
+            <div class="highlight">{{ ai_hook }}</div>
           {% endif %}
 
           <!-- Main content area with generous spacing for readability -->
-          <div style="background:#ffffff;border:1px solid rgba(0,0,0,0.03);padding:16px;border-radius:10px;margin-bottom:16px;line-height:1.7;font-size:15px;color:#234b38;">
+          <div style="background:#ffffff;border:1px solid rgba(0,0,0,0.03);padding:18px;border-radius:10px;margin-bottom:16px;line-height:1.7;font-size:15px;color:#234b38;">
             {{ ai_body|safe }}
+            <!-- CTA example: rendered only if AI left a CTA block or template provides one -->
           </div>
         </div>
         <div class="footer">
