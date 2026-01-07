@@ -1,0 +1,51 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+      /* K-12 style guide */
+      :root{--k12-accent-1:#f7df6b; --k12-accent-2:#26b06d; --k12-body:#163824}
+      body{margin:0;padding:0;font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;background:#f5fbf3;color:var(--k12-body)}
+      .wrap{width:100%;padding:20px 0;background:#f5fbf3}
+      .card{max-width:700px;margin:0 auto;background:#ffffff;border-radius:12px;overflow:hidden;border:1px solid rgba(0,0,0,0.03)}
+      .header{background:linear-gradient(90deg,var(--k12-accent-1),var(--k12-accent-2));color:#08331f;padding:22px 20px;text-align:center}
+      .brand{font-size:22px;font-weight:800;margin:0}
+      .tag{margin:6px 0 0 0;font-size:13px}
+      .hook{font-size:18px;font-weight:800;color:#0b3b26;margin:12px 0}
+      .content{padding:20px;color:#234b38;line-height:1.6;font-size:15px}
+      .lead{background:#fff9d6;border-left:6px solid #f5d84c;padding:10px;border-radius:6px;color:#2f3b1f;font-weight:700;margin-bottom:12px}
+      .cta{display:inline-block;background:linear-gradient(90deg,#2fc071,#1aa35a);color:#fff;padding:10px 16px;border-radius:8px;text-decoration:none;font-weight:700}
+      .footer{background:#fbfbf9;padding:16px 20px;color:#6a7466;font-size:13px;text-align:center}
+      /* paragraph helper for mobile */
+      p{margin:0 0 12px 0}
+      @media (max-width:600px){.brand{font-size:20px}.hook{font-size:16px}}
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <div class="card">
+        <div class="header">
+          <p class="brand">EduAI Hub</p>
+          <p class="tag">Where education meets Intelligence</p>
+        </div>
+
+        <div class="content">
+          <p style="margin:0 0 12px 0;color:#113826">{% if recipient_name %}Hi {{ recipient_name }},{% else %}Hello,{% endif %}</p>
+          {% if ai_hook %}
+            <div class="lead">{{ ai_hook }}</div>
+          {% endif %}
+
+          {{ ai_greeting|safe }}
+          {{ ai_main_body|safe }}
+
+          <div style="margin-top:14px;text-align:center">
+            <a href="https://www.eduaihub.in/demo" class="cta">Request a short demo</a>
+          </div>
+        </div>
+
+        <div class="footer">EduAI Hub — Where education meets Intelligence • <a href="https://www.eduaihub.in/" style="color:#175a30;text-decoration:none">eduaihub.in</a></div>
+      </div>
+    </div>
+  </body>
+</html>

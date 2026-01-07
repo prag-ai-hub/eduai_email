@@ -1,0 +1,176 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Preview — EduAIHub Mailer</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  </head>
+  <body class="bg-light">
+    <div class="container py-4">
+      <h2>Preview & Confirm</h2>
+      <p>Found <strong>{{ count }}</strong> recipients. Scroll to preview the email.</p>
+
+      <div class="card mb-3">
+        <div class="card-body">
+          <h5 class="card-title">Subject</h5>
+          <p>{{ subject }}</p>
+          {% if product_name %}
+            <h5 class="card-title">Product</h5>
+            <p>{{ product_name }}</p>
+          {% endif %}
+          <h5 class="card-title">From</h5>
+          <p>{{ sender_name if sender_name else 'Configured SMTP Email' }}</p>
+          {% if custom_mode and ai_personalize == '1' %}
+            <div class="alert alert-info mt-2">Personalization enabled: messages will be personalized per recipient using their name from the uploaded file.</div>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="col-md-6">
+          <div class="card mb-3">
+            <div class="card-body">
+              <h5>Recipients</h5>
+              <form id="previewForm" method="post" action="{% if custom_mode %}/custom-start-send{% elif greeting_mode %}/greetings-start-send{% else %}{{ '/product-start-send' if product_key else '/start-send' }}{% endif %}">
+                <textarea name="emails" class="form-control" rows="10">{% for e in emails %}{{ e }}
+{% endfor %}</textarea>
+                <input type="hidden" name="subject" value="{{ subject }}">
+                <input type="hidden" name="sender_name" value="{{ sender_name }}">
+                {% if product_key %}
+                  <input type="hidden" name="product_key" value="{{ product_key }}">
+                {% endif %}
+                {% if custom_note %}
+                  <input type="hidden" name="custom_note" value="{{ custom_note }}">
+                {% endif %}
+                {% if intro %}
+                  <input type="hidden" name="intro" value="{{ intro|e }}">
+                {% endif %}
+                {% if custom_attachments %}
+                  <input type="hidden" name="custom_attachments" value="{{ custom_attachments }}">
+                {% endif %}
+                {% if recipient_data %}
+                  <input type="hidden" name="recipient_data" value="{{ recipient_data|e }}">
+                {% endif %}
+                {% if greeting_mode %}
+                  <input type="hidden" name="greeting_kind" value="{{ greeting_kind }}">
+                {% endif %}
+
+                <!-- include the rendered HTML so confirm step shows the exact preview -->
+                <textarea name="email_html" style="display:none;">{{ email_html|e }}</textarea>
+                <!-- For greetings we also include a fragment (no header/footer). Sending will use this fragment to render per-recipient to avoid duplicate headers/footers -->
+                {% if greeting_mode %}
+                  <input type="hidden" name="email_fragment" value="{{ email_fragment|e }}">
+                {% endif %}
+                <!-- For custom mode include recipient data and personalization flag -->
+                {% if custom_mode %}
+                  {% if recipient_data %}
+                    <input type="hidden" name="recipient_data" value="{{ recipient_data|e }}">
+                  {% endif %}
+                  <input type="hidden" name="ai_personalize" value="1">
+                  {% if email_fragment %}
+                    <input type="hidden" name="email_fragment" value="{{ email_fragment|e }}">
+                    <input type="hidden" name="fragment_has_greeting" value="{{ fragment_has_greeting if fragment_has_greeting else '0' }}">
+                    <input type="hidden" name="fragment_needs_greeting" value="{{ '1' if not fragment_has_greeting else '0' }}">
+                  {% endif %}
+                  <input type="hidden" name="use_ai" value="0">
+                  <input type="hidden" name="ai_structure_only" value="1">
+                {% endif %}
+
+                <div class="form-check mt-2 mb-3">
+                  <input class="form-check-input" type="checkbox" value="1" id="dryRun" name="dry_run">
+                  <label class="form-check-label" for="dryRun">Dry run (do not send)</label>
+                </div>
+
+                <div class="mt-3 d-flex gap-2 align-items-center">
+                  <button id="sendBtn" class="btn btn-success" type="button">Send (5s)</button>
+                  <a class="btn btn-secondary" href="/">Back</a>
+                </div>
+
+                <hr />
+                <div class="mt-2">
+                  <form id="sendPreviewForm" method="post" action="/send-preview" class="row g-2 align-items-center">
+                    <div class="col-auto">
+                      <label class="form-label" for="testEmail">Send preview to</label>
+                    </div>
+                    <div class="col">
+                      <input id="testEmail" name="test_email" class="form-control" type="email" placeholder="your.email@example.com">
+                      <div class="form-text">Sends the exact preview HTML to the address you provide (use for verification).</div>
+                    </div>
+                    <input type="hidden" name="subject" value="{{ subject }}">
+                    <input type="hidden" name="sender_name" value="{{ sender_name }}">
+                    <textarea name="email_html" style="display:none;">{{ email_html|e }}</textarea>
+                    <div class="col-auto">
+                      <button id="sendPreviewBtn" class="btn btn-outline-primary" type="submit">Send preview</button>
+                    </div>
+                  </form>
+                </div>
+
+                <div id="countdownArea" style="display:none;margin-top:12px;">
+                  <div class="alert alert-warning d-flex justify-content-between align-items-center">
+                    <div id="countdownText">Sending in <strong id="count">5</strong> seconds...</div>
+                    <div>
+                      <button id="cancelBtn" class="btn btn-sm btn-outline-dark" type="button">Cancel</button>
+                    </div>
+                  </div>
+                </div>
+
+              </form>
+
+              <script>
+                (function(){
+                  const sendBtn = document.getElementById('sendBtn');
+                  const countdownArea = document.getElementById('countdownArea');
+                  const countEl = document.getElementById('count');
+                  const cancelBtn = document.getElementById('cancelBtn');
+                  const form = document.getElementById('previewForm');
+                  let timer = null;
+                  let seconds = 5;
+
+                  function startCountdown(){
+                    // if dry run selected, submit immediately
+                    if(document.getElementById('dryRun').checked){
+                      form.submit();
+                      return;
+                    }
+                    seconds = 5;
+                    countEl.textContent = seconds;
+                    countdownArea.style.display = 'block';
+                    sendBtn.disabled = true;
+                    timer = setInterval(()=>{
+                      seconds -= 1;
+                      countEl.textContent = seconds;
+                      if(seconds <= 0){
+                        clearInterval(timer);
+                        form.submit();
+                      }
+                    }, 1000);
+                  }
+
+                  function cancelCountdown(){
+                    if(timer) clearInterval(timer);
+                    countdownArea.style.display = 'none';
+                    sendBtn.disabled = false;
+                  }
+
+                  sendBtn.addEventListener('click', startCountdown);
+                  cancelBtn.addEventListener('click', cancelCountdown);
+                })();
+              </script>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-6">
+          <div class="card mb-3">
+            <div class="card-body">
+              <h5>Email Preview</h5>
+              <div style="border:1px solid #ddd;padding:10px;max-height:600px;overflow:auto;">
+                {{ email_html|safe }}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>

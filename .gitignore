@@ -1,0 +1,10 @@
+# Environment variables
+.env
+secrets/
+.secrets/
+
+# OS / editor
+__pycache__/
+*.pyc
+.vscode/
+.idea/

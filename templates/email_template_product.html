@@ -1,0 +1,129 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+      :root{--accent-1:#f5d84c;--accent-2:#2fc071;--accent-dark:#1e7e34}
+      body{margin:0;padding:0;font-family: -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;background:#f3f6f5;color:#15362b}
+      .wrap{width:100%;padding:24px 0;background:#f3f6f5}
+      .card{max-width:700px;margin:0 auto;background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 8px 22px rgba(16, 24, 40, 0.06)}
+      .header{background:linear-gradient(90deg,var(--accent-1) 0%, var(--accent-2) 100%);color:#064122;padding:28px 22px}
+      .brand{font-size:20px;font-weight:800;letter-spacing:0.2px;margin:0}
+      .tagline{margin:6px 0 0 0;font-size:13px;color:rgba(6,65,34,0.9)}
+      .content{padding:22px}
+      .hero{display:flex;gap:18px;align-items:center}
+      .hero .img{flex:0 0 140px}
+      .hero img{width:140px;height:100px;object-fit:cover;border-radius:10px;display:block;border:6px solid rgba(255,255,255,0.6)}
+      .hero .text{flex:1}
+      .hook{font-size:20px;font-weight:800;color:#0b3b26;margin:0 0 8px;line-height:1.15}
+      .intro{margin:0 0 12px 0;color:#234b38}
+      .cta{display:inline-block;background:linear-gradient(90deg,var(--accent-2),#1aa35a);color:#fff;padding:10px 16px;border-radius:10px;text-decoration:none;font-weight:700}
+
+      .product-details{margin-top:18px}
+      .p-block{display:flex;gap:14px;padding:14px;border-radius:10px;background:linear-gradient(180deg, #fbfff7 0%, #f7fff9 100%);border:1px solid rgba(8,90,45,0.04);align-items:flex-start}
+      .p-block .thumb{flex:0 0 90px}
+      .p-block img{width:90px;height:68px;object-fit:cover;border-radius:8px}
+      .p-title{font-size:16px;font-weight:700;color:var(--accent-dark);margin:0 0 6px}
+      .p-desc{margin:0 0 10px;color:#385a4a}
+      .p-pains{margin:0 0 8px;color:#b23b3b;font-weight:700}
+
+      .footer{background:#fafaf8;padding:18px 22px;color:#5d6a5b;font-size:13px}
+
+      @media (max-width:600px){
+        .hero{flex-direction:column;align-items:stretch}
+        .hero .img{width:100%}
+        .hero img{width:100%;height:160px}
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <div class="card">
+        <div class="header">
+          <p class="brand">EduAI Hub</p>
+          <p class="tagline">Where education meets Intelligence</p>
+        </div>
+
+        <div class="content">
+          <p style="margin:0 0 12px 0;color:#113826">{% if recipient_name %}Hi {{ recipient_name }},{% else %}Hello,{% endif %}</p>
+          <!-- Problem-first block (lead with pain statement) -->
+          {% if ai_hook %}
+            <div style="margin:12px 0;padding:12px;border-radius:8px;background-color:#fff9d6;border-left:6px solid #f5d84c;color:#2f3b1f;font-weight:700;font-size:16px">{{ ai_hook }}</div>
+          {% elif product_pains %}
+            <div style="margin:12px 0;padding:12px;border-radius:8px;background-color:#fff9d6;border-left:6px solid #f5d84c;color:#2f3b1f;font-weight:700;font-size:16px">{{ product_pains[0] }}</div>
+          {% endif %}
+
+          <!-- Product hero with features and testimonial -->
+          <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin-top:12px;">
+            <tr>
+              <td style="vertical-align:top;padding-right:12px;width:62%;">
+                <div style="font-size:20px;font-weight:800;color:#0b3b26;margin-bottom:8px">{{ product_name }}</div>
+                <div style="font-size:14px;color:#234b38;margin-bottom:12px">{{ product_desc }}</div>
+                <div style="margin-bottom:12px">
+                  <a href="{{ product_link }}" style="display:inline-block;padding:10px 14px;background-color:#2fc071;color:#ffffff;text-decoration:none;border-radius:8px;font-weight:700">Learn more</a>
+                </div>
+
+                {% if product_features %}
+                <table role="presentation" style="width:100%;margin-top:6px;">
+                  {% for f in product_features %}
+                  <tr>
+                    <td style="vertical-align:top;padding:8px 0;">
+                      <div style="font-weight:700;color:#175a30;font-size:14px">&#9679; {{ f.split('\n')[0] }}</div>
+                      <div style="font-size:13px;color:#425a4b">{{ f }}</div>
+                    </td>
+                  </tr>
+                  {% endfor %}
+                </table>
+                {% endif %}
+
+              </td>
+              <td style="vertical-align:top;width:38%;text-align:center;">
+                {% if product_image %}
+                  <img src="{{ product_image }}" alt="{{ product_name }}" width="180" style="display:block;border-radius:8px;max-width:100%;height:auto;" />
+                {% endif %}
+                <div style="margin-top:12px;background:#fbfff7;padding:10px;border-radius:6px;border:1px solid rgba(0,0,0,0.03);font-size:13px;color:#234b38">"We cut grading time by 50%" — Headteacher, Greenfield School</div>
+              </td>
+            </tr>
+          </table>
+
+          {% if product_pains|length > 1 %}
+            <div style="margin-top:14px;padding:12px;border-radius:8px;background:linear-gradient(180deg,#fbfff7 0%, #f7fff9 100%);border:1px solid rgba(8,90,45,0.04);color:#3b2b00">
+              <strong style="display:block;margin-bottom:8px">More challenges we solve</strong>
+              <ul style="margin:0 0 0 18px;color:#4e453f">
+                {% for p in product_pains[1:] %}
+                  <li style="margin-bottom:6px">{{ p }}</li>
+                {% endfor %}
+              </ul>
+            </div>
+          {% endif %}
+
+          {% if product_features %}
+            <div class="product-details">
+              <h4 style="margin:0 0 10px 0;color:#2a5a3e">How it helps</h4>
+              <div style="display:flex;flex-direction:column;gap:10px">
+                {% for f in product_features %}
+                  <div class="p-block">
+                    {% if product_image %}
+                      <div class="thumb"><img src="{{ product_image }}" alt="feature"/></div>
+                    {% endif %}
+                    <div>
+                      <p class="p-title">{{ f.split('\n')[0] }}</p>
+                      <p class="p-desc">{{ f }}</p>
+                    </div>
+                  </div>
+                {% endfor %}
+              </div>
+            </div>
+          {% endif %}
+
+          {% if custom_note %}
+            <div style="margin-top:14px;padding:12px;border-radius:8px;background:#f5fbff;color:#234959">{{ custom_note }}</div>
+          {% endif %}
+        </div>
+
+        <div class="footer">EduAI Hub — Where education meets Intelligence</div>
+      </div>
+    </div>
+  </body>
+</html>

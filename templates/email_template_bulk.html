@@ -1,0 +1,118 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+  </head>
+  <body style="margin:0;padding:0;background-color:#f6faf6;font-family:Arial,Helvetica,sans-serif;color:#1f3529;">
+    <!-- Outer table -->
+    <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="background-color:#f6faf6;padding:20px 0;width:100%;">
+      <tr>
+        <td align="center">
+          <!-- Container -->
+          <table width="700" cellpadding="0" cellspacing="0" role="presentation" style="width:700px;max-width:700px;background-color:#ffffff;border-radius:8px;overflow:hidden;">
+            <!-- Preheader (hidden preview text for inboxes) -->
+            <tr>
+              <td style="display:none!important;font-size:1px;color:#ffffff;line-height:1px;max-height:0px;max-width:0px;opacity:0;overflow:hidden;">{{ intro if intro else 'Overwhelmed by admin work, grading, and impersonal feedback? See how EduAI helps.' }}</td>
+            </tr>
+
+            <!-- Header -->
+            <tr>
+              <td align="left" style="padding:20px;background-color:#f5d84c;color:#08331f;font-weight:800;font-size:20px;border-bottom:1px solid rgba(0,0,0,0.04);">
+                EduAI Hub
+                <div style="font-weight:600;font-size:13px;margin-top:6px;color:rgba(8,51,31,0.9);">Where education meets Intelligence</div>
+              </td>
+            </tr>
+
+            <!-- Hero + Features -->
+            <tr>
+              <td style="padding:18px;background-color:#ffffff;">
+                <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
+                  <tr>
+                    <td style="vertical-align:top;padding-right:12px;">
+                      <!-- Pain-first problem statement -->
+                      <div style="background-color:#fff9d6;border-left:4px solid #f5d84c;padding:12px;border-radius:6px;color:#2f3b1f;font-weight:700;margin-bottom:10px;font-size:16px;">{{ intro if intro else 'Overwhelmed by administrative tasks and grading? You are not alone.' }}</div>
+
+                      <div style="font-size:15px;color:#2f4f3f;margin-top:8px;">EduAI provides focused solutions for grading, feedback, and classroom workflows — designed to reduce admin time and improve learning.</div>
+
+                      <!-- Feature row (email-safe) -->
+                      <table cellpadding="0" cellspacing="0" role="presentation" style="width:100%;margin-top:14px;">
+                        <tr>
+                          <td style="vertical-align:top;padding-right:8px;width:33%;text-align:left;">
+                            <div style="font-weight:700;color:#175a30;font-size:14px;margin-bottom:6px">Auto grading</div>
+                            <div style="font-size:13px;color:#425a4b">Save hours with automated assessment workflows.</div>
+                          </td>
+                          <td style="vertical-align:top;padding-right:8px;width:33%;text-align:left;">
+                            <div style="font-weight:700;color:#175a30;font-size:14px;margin-bottom:6px">Personalized feedback</div>
+                            <div style="font-size:13px;color:#425a4b">Deliver tailored feedback at scale to every student.</div>
+                          </td>
+                          <td style="vertical-align:top;width:34%;text-align:left;">
+                            <div style="font-weight:700;color:#175a30;font-size:14px;margin-bottom:6px">Easy integration</div>
+                            <div style="font-size:13px;color:#425a4b">Plug into existing classroom tools without extra hardware.</div>
+                          </td>
+                        </tr>
+                      </table>
+
+                      <!-- CTA -->
+                      <div style="margin-top:12px;">
+                        <table role="presentation" cellpadding="0" cellspacing="0" style="margin-top:8px;">
+                          <tr>
+                            <td align="center" bgcolor="#2fc071" style="border-radius:6px;">
+                              <a href="https://www.eduaihub.in/" style="display:inline-block;padding:11px 18px;color:#ffffff;font-weight:800;text-decoration:none;font-size:14px;border-radius:6px;">Get started — Book a demo</a>
+                            </td>
+                          </tr>
+                        </table>
+                      </div>
+                    </td>
+                    <td style="vertical-align:top;width:220px;text-align:center;">
+                      {% if banner_url %}
+                        <img src="{{ banner_url }}" alt="EduAIHub" width="220" style="display:block;border-radius:6px;max-width:100%;height:auto;" />
+                      {% endif %}
+                      <!-- Small testimonial -->
+                      <div style="margin-top:10px;background:#fbfff7;border-radius:6px;padding:10px;font-size:13px;color:#234b38;border:1px solid rgba(0,0,0,0.03);">"EduAI halved our grading time — Principal, St. Mary's"</div>
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+
+            <!-- Products list -->
+            <tr>
+              <td style="padding:12px 18px 18px 18px;background-color:#fbfff7;">
+                {% for key, p in products.items() %}
+                <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin-bottom:12px;background-color:#ffffff;border:1px solid rgba(0,0,0,0.04);border-radius:6px;">
+                  <tr>
+                    <td style="width:86px;padding:10px;vertical-align:top;">
+                      {% if p.image_url %}
+                        <img src="{{ p.image_url }}" alt="{{ p.name }}" width="86" style="display:block;border-radius:6px;max-width:100%;height:auto;" />
+                      {% endif %}
+                    </td>
+                    <td style="padding:10px;vertical-align:top;">
+                      <div style="font-weight:700;color:#175a30;font-size:15px;margin-bottom:6px;">{{ p.name }}</div>
+                      {% if p.pains %}
+                        <div style="font-weight:700;color:#a43c3c;font-size:13px;margin-bottom:6px;">Challenges: {% for pain in p.pains %}{{ pain }}{% if not loop.last %} • {% endif %}{% endfor %}</div>
+                      {% endif %}
+                      <div style="font-size:13px;color:#425a4b;margin-bottom:8px;">{{ p.desc }}</div>
+                      <div>
+                        <a href="{{ p.link }}" style="display:inline-block;padding:8px 12px;background-color:#2fc071;color:#ffffff;text-decoration:none;border-radius:6px;font-weight:700;font-size:13px;">Learn about {{ p.name }}</a>
+                      </div>
+                    </td>
+                  </tr>
+                </table>
+                {% endfor %}
+              </td>
+            </tr>
+
+            <!-- Footer -->
+            <tr>
+              <td style="padding:14px 18px;background-color:#f8faf8;color:#6b6f61;font-size:13px;text-align:center;">
+                EduAI Hub — Where education meets Intelligence. Visit <a href="https://www.eduaihub.in/" style="color:#175a30;text-decoration:none;font-weight:600;">eduaihub.in</a>
+              </td>
+            </tr>
+
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>

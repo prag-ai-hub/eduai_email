@@ -1,0 +1,98 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <title>Greeting Mails</title>
+  </head>
+  <body class="bg-light">
+    <div class="container py-4">
+      <h3>Send Greeting Mail (Bulk)</h3>
+      <form method="post" action="/greetings/send" enctype="multipart/form-data">
+        <div class="mb-3">
+          <label class="form-label">Upload recipients (Excel/CSV)</label>
+          <input class="form-control" name="file" type="file" accept=".csv,.xls,.xlsx">
+          <div class="form-text">The sheet should contain an email column (any column name containing 'email'). Optionally include a name column.</div>
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label">Or single recipient email</label>
+          <input class="form-control" name="email">
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label">Greeting Type</label>
+          <select class="form-select" name="type">
+            <option value="invitation">Invitation (meeting)</option>
+            <option value="thankyou">Thank You</option>
+            <option value="onboarding">Onboarding</option>
+            <option value="followup" selected>Follow Up</option>
+          </select>
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label">Market class</label>
+          <select class="form-select" name="market_class">
+            <option value="">Default</option>
+            <option value="k12">K-12 (Primary & Secondary)</option>
+            <option value="higher_ed">Higher Ed</option>
+            <option value="coaching">Coaching / Test Prep</option>
+          </select>
+          <div class="form-text">Choose the audience so the template, colors, and tone match the market.</div>
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label">Subject (optional)</label>
+          <input class="form-control" name="subject" placeholder="Subject line to use for all recipients">
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label">Body (supports links and basic HTML)</label>
+          <textarea class="form-control" name="body" id="greetBody" rows="6" placeholder="Write your message here. You can include &lt;a&gt; links and inline images via URL."></textarea>
+          <div class="form-text">Tip: check "Use AI to improve" below to rewrite this into a short marketing message (pain-first).</div>
+        </div>
+
+        <div class="mb-3 form-check">
+          <input class="form-check-input" type="checkbox" value="1" id="useAi" name="use_ai">
+          <label class="form-check-label" for="useAi">Use OpenAI to rewrite and improve the Body (pain-first)</label>
+        </div>
+        {% if config.OPENAI_AVAILABLE %}
+          <div class="alert alert-info">OpenAI is available — AI rewrite will be used by default. Uncheck the box above to disable.</div>
+        {% endif %}
+
+        <div class="mb-3">
+          <label class="form-label">Attachments (optional)</label>
+          <input class="form-control" name="attachments" type="file" multiple>
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label">Related Product (optional)</label>
+          <select class="form-select" name="product_key">
+            <option value="">None</option>
+            {% for key,p in products.items() %}
+              <option value="{{ key }}">{{ p.name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label">Optional note</label>
+          <input class="form-control" name="note" placeholder="Short note to include in the email (optional)">
+        </div>
+
+        <div class="mb-3">
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" id="dryRun" name="dry_run" value="1">
+            <label class="form-check-label" for="dryRun">Dry run (do not send, preview only)</label>
+          </div>
+        </div>
+
+        <div class="mb-3">
+          <button class="btn btn-primary" type="submit">Preview & Confirm</button>
+          <a class="btn btn-secondary" href="/">Back</a>
+        </div>
+      </form>
+    </div>
+  </body>
+</html>

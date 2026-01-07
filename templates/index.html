@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>EduAIHub Bulk Mailer</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  </head>
+  <body class="bg-light">
+    <div class="container py-5">
+      <h1 class="mb-4">EduAIHub — Bulk Email Tool</h1>
+      <div class="card mb-4">
+        <div class="card-body">
+          <form method="post" enctype="multipart/form-data">
+            <div class="mb-3">
+              <label class="form-label">Upload Excel/CSV with emails</label>
+              <input class="form-control" type="file" name="file" accept=".xlsx,.xls,.csv" required>
+            </div>
+            <div class="mb-3">
+              <label class="form-label">Sender name (optional)</label>
+              <input class="form-control" type="text" name="sender_name" placeholder="Your name or company">
+            </div>
+            <div class="mb-3">
+              <label class="form-label">Email subject</label>
+              <input class="form-control" type="text" name="subject" value="Explore EduAIHub — AI tools for classrooms">
+            </div>
+            <div class="mb-3">
+              <label class="form-label">Intro / Hook (optional)</label>
+              <textarea class="form-control" name="intro" rows="3" placeholder="A short hook or opening paragraph to include in the email"></textarea>
+            </div>
+            <button class="btn btn-primary" type="submit">Upload & Preview</button>
+          </form>
+        </div>
+      </div>
+      <p class="text-muted">The tool will parse a column named 'email' (case-insensitive) or the first column as a fallback.</p>
+    </div>
+  </body>
+</html>

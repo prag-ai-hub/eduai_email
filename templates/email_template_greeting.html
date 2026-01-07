@@ -1,0 +1,61 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+      :root{--accent-1:#f5d84c;--accent-2:#2fc071}
+      body{margin:0;padding:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;background:#f5fbf5;color:#163824}
+      .wrap{width:100%;padding:20px 0;background:#f5fbf5}
+      .card{max-width:720px;margin:0 auto;background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 10px 30px rgba(20,40,20,0.04)}
+      .header{background:linear-gradient(90deg,var(--accent-1),var(--accent-2));color:#08331f;padding:28px 24px;text-align:center}
+      .header h1{margin:0;font-size:26px;font-weight:800}
+      .header-sub{margin:6px 0 0 0;color:#163824;opacity:0.95}
+      .hero{padding:18px 24px;border-bottom:1px solid rgba(8,51,31,0.04);text-align:left}
+      .greeting{margin:0;font-size:15px}
+      .hook{font-size:20px;color:#0e3f29;margin:8px 0 0 0;font-weight:800}
+      .content{padding:22px 24px;color:#2d4e44;line-height:1.7}
+      .divider{height:1px;background:rgba(0,0,0,0.04);margin:18px 0}
+      .closing{padding:0 24px 20px 24px}
+      .footer{background:#fbfbf9;padding:18px 24px;color:#6a7466;font-size:13px;text-align:center}
+      @media (max-width:600px){.header h1{font-size:22px}.hook{font-size:18px}}
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <div class="card">
+        <!-- Preheader (hidden preview) -->
+        <div style="display:none!important;font-size:1px;color:#ffffff;line-height:1px;max-height:0px;max-width:0px;opacity:0;overflow:hidden;">{{ ai_hook if ai_hook else 'A warm message from EduAIHub' }}</div>
+
+        <div class="header">
+          <h1>EduAI Hub</h1>
+          <div class="header-sub">Where education meets Intelligence</div>
+        </div>
+
+        <div class="hero">
+          <p class="greeting">{% if recipient_name %}Hi {{ recipient_name }},{% else %}Hello,{% endif %}</p>
+          {% if ai_hook %}
+            <div style="background-color:#fff9d6;border-left:4px solid #f5d84c;padding:12px;border-radius:6px;color:#2f3b1f;font-weight:700;margin:8px 0;">{{ ai_hook }}</div>
+          {% endif %}
+        </div>
+
+        <div class="content">
+          {{ ai_greeting|safe }}
+          {{ ai_main_body|safe }}
+          {{ ai_closing|safe }}
+        </div>
+
+        <div class="divider"></div>
+        <div class="closing">
+          <p style="margin:0 0 8px 0;color:#55685a;font-size:14px">Warm regards,</p>
+          <p style="margin:0;font-weight:700;color:#163824">EduAI Hub</p>
+          <p style="margin:8px 0 0 0;color:#6a7466;font-size:13px">Where education meets Intelligence.</p>
+        </div>
+
+        <div class="footer">
+          Visit <a href="https://www.eduaihub.in/">eduaihub.in</a> for more information • <a href="#" style="color:#175a30;text-decoration:none">Unsubscribe</a>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>

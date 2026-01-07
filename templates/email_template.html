@@ -1,0 +1,94 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+      /* Responsive email-friendly styles */
+      body { margin:0; padding:0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; color:#333; background:#f4f6f8; }
+      .wrap { width:100%; background:#f4f6f8; padding:20px 0; }
+      .container { width:100%; max-width:700px; margin:0 auto; background:#ffffff; border-radius:8px; overflow:hidden; }
+      .header { background:linear-gradient(90deg,#0d6efd 0%,#6610f2 100%); color:white; padding:22px; text-align:left }
+      .header h1 { margin:0; font-size:22px }
+      .header p { margin:6px 0 0 0; opacity:0.95 }
+      .hero { padding:22px; }
+      .hook { font-size:20px; font-weight:700; color:#0d3bb5; margin:0 0 8px 0 }
+      .subhook { margin:0 0 16px 0; color:#556 }
+      .cta { display:inline-block; background:#0d6efd; color:white; padding:10px 14px; border-radius:6px; text-decoration:none; font-weight:600 }
+      .products-table { width:100%; border-collapse:collapse; }
+      .prod-td { padding:14px; vertical-align:top }
+      .prod { border:1px solid #eef2f7; border-radius:6px; padding:12px; display:block }
+      .prod h3 { margin:0 0 8px 0; font-size:16px; color:#0d3bb5 }
+      .prod p { margin:0 0 12px 0; color:#444; font-size:14px }
+      .prod a { display:inline-block; background:#0d6efd; color:white; padding:8px 12px; border-radius:6px; text-decoration:none }
+      .footer { padding:14px; font-size:13px; color:#6b7280; background:#f7f9fb }
+      .muted { color:#8b93a7 }
+
+      /* Breakpoints for different screens */
+      @media only screen and (max-width:600px){
+        .header { text-align:center }
+        .hero { text-align:center }
+        .hook { font-size:18px }
+        .prod-td { display:block; width:100% !important }
+        .prod { margin-bottom:12px }
+      }
+      @media only screen and (min-width:601px) and (max-width:900px){
+        .prod h3 { font-size:15px }
+        .cta { padding:10px 12px }
+      }
+      @media only screen and (min-width:901px){
+        .prod h3 { font-size:16px }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <center>
+        <div class="container" role="article">
+          <div class="header">
+            <h1>EduAIHub</h1>
+            <p>Practical AI tools that empower teachers and students</p>
+          </div>
+
+          <div class="hero">
+            <p class="hook">Transform your classroom instantly — intelligent, affordable, and hardware-free.</p>
+            <p class="subhook">Create engaging lessons, reduce paperwork, and spark creativity with AI-powered tools built for real classrooms.</p>
+            <p style="margin:12px 0 0 0"><a href="https://www.eduaihub.in/" class="cta">Explore EduAIHub</a></p>
+          </div>
+
+          <!-- Products grid using table for email compatibility -->
+          <table class="products-table" cellpadding="0" cellspacing="0" role="presentation">
+            <tr>
+              <td class="prod-td" width="33%" style="width:33%;">
+                <div class="prod">
+                  <h3>Class Tom</h3>
+                  <p>Turn any classroom into an interactive AI-driven learning space — no smartboards or extra hardware required.</p>
+                  <a href="https://www.eduaihub.in/class-tom/">Learn more</a>
+                </div>
+              </td>
+              <td class="prod-td" width="33%" style="width:33%;">
+                <div class="prod">
+                  <h3>Vidya Hub</h3>
+                  <p>Automate grading, feedback, and admin tasks so teachers spend more time teaching and less on paperwork.</p>
+                  <a href="https://www.eduaihub.in/vidya-hub/">Explore</a>
+                </div>
+              </td>
+              <td class="prod-td" width="33%" style="width:33%;">
+                <div class="prod">
+                  <h3>AI Viz Lab</h3>
+                  <p>Hands-on AI visual labs for students to explore, experiment, and express creativity with AI tools.</p>
+                  <a href="https://www.eduaihub.in/vidya-hub-2/">Discover</a>
+                </div>
+              </td>
+            </tr>
+          </table>
+
+          <div class="footer">
+            <p style="margin:0 0 8px 0">EduAIHub builds practical AI tools for education. Visit <a href="https://www.eduaihub.in/">eduaihub.in</a> or reply to this email to start a conversation.</p>
+            <p class="muted" style="margin:6px 0 0 0">Rohit Shinde • rohit.shinde@eduaihub.in • <span>© EduAIHub</span></p>
+          </div>
+        </div>
+      </center>
+    </div>
+  </body>
+</html>
