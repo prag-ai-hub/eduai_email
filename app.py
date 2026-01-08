@@ -209,6 +209,150 @@ def build_default_structure(fragment_html: str, subject: str = '', sender_name: 
     return structure_html, structure_css
 
 
+def guess_gender(name: str) -> str | None:
+    """Small heuristic to guess gender from first name.
+
+    - Uses curated lists for common names
+    - Falls back to a very small heuristic (names ending with 'a' often female) when unknown
+    """
+    if not name:
+        return None
+    first = str(name).strip().split()[0].lower()
+    male = {'rohit','abhishek','rahul','raj','arun','vijay','ajay','john','mike','robert','srikanth','krishna','sai'}
+    female = {'neha','anita','sneha','rekha','asha','sarah','lisa','mary','uzma','prachi','meena'}
+    if first in male:
+        return 'male'
+    if first in female:
+        return 'female'
+    # small heuristic: many Indian/female names end with 'a' (best-effort)
+    if first.endswith('a') and len(first) > 2:
+        return 'female'
+    return None
+
+
+def format_name_with_honorific(name: str) -> str:
+    """Return an HTML-safe formatted name with bold and optional honorific.
+
+    - Title-cases the provided name for consistent appearance
+    - Uses `guess_gender` to decide whether to append a gendered honorific
+      ('Sir' for male, "Ma'am" for female). If unknown, no honorific is added.
+    """
+    if not name:
+        return ''
+    # Normalize spacing and title-case each component (keeps initials sensible)
+    parts = [p.strip().capitalize() for p in str(name).strip().split() if p.strip()]
+    pretty_name = ' '.join(parts)
+    gender = guess_gender(pretty_name)
+    honorific = ''
+    if gender == 'male':
+        honorific = ' Sir'
+    elif gender == 'female':
+        honorific = " Ma'am"
+    return f"<strong>{pretty_name}</strong>{honorific}"
+
+
+def normalize_greetings_keep_single(html: str, name: str, p_style: str) -> str:
+    """Ensure exactly one greeting at the very top of the fragment.
+
+    - Removes all greeting occurrences (hi|hello|dear) near the top and inserts a single formatted greeting if `name` is provided.
+    - If `name` is empty, removes greetings entirely.
+    """
+    if not html:
+        return html
+    try:
+        # Remove greeting lines or <p> tags that are just greetings anywhere near the start
+        # Pattern matches greetings with optional surrounding <p> tags and commas/spaces
+        cleaned = re.sub(r'(?im)(?:<p[^>]*>\s*)?(?:\b(?:hi|hello|dear)\b)[^<\n]{0,200},?\s*(?:</p>)?', '', html, count=0)
+        # Collapse leading whitespace
+        cleaned = re.sub(r'^\s+', '', cleaned)
+        # Insert single greeting at top if name provided
+        if name:
+            greeting_html = f"<p style=\"{p_style}\">Hi {format_name_with_honorific(name)},</p>"
+            return greeting_html + cleaned
+        return cleaned
+    except Exception:
+        return html
+
+def collapse_leading_greetings(s: str) -> str:
+    """Collapse multiple leading greeting lines into a single greeting.
+
+    Works for plain text and simple HTML paragraphs at the top of the content. Keeps
+    the first greeting and removes subsequent consecutive greeting lines.
+    """
+    if not s:
+        return s
+    try:
+        pattern = re.compile(r"\A(\s*(?:<p[^>]*>\s*)?(?:hi|hello|dear)\b[^<\n]{0,80},?\s*(?:</p>)?\s*)+", flags=re.I)
+        m = pattern.match(s)
+        if not m:
+            return s
+        first_pat = re.compile(r"(?:<p[^>]*>\s*)?(?:hi|hello|dear)\b[^<\n]{0,80},?\s*(?:</p>)?", flags=re.I)
+        first_m = first_pat.search(m.group(0))
+        first_greeting = first_m.group(0) if first_m else ''
+        rest = s[m.end():]
+        return first_greeting + rest
+    except Exception:
+        return s
+
+
+def collapse_and_format_leading_greetings(html: str, name: str, p_style: str) -> str:
+    """Ensure the resulting HTML has at most one leading greeting and that it is formatted.
+
+    - If `name` is provided, replace any greeting marker or leading greetings with a single
+      paragraph containing a bolded name and optional honorific tuned to a simple gender guess.
+    - If no `name` is provided, remove leading greetings entirely.
+    """
+    if not html:
+        return html
+    try:
+        # Normalize common greeting marker to a single placeholder so detection is easier
+        marker = '___RECIPIENT_NAME_PLACEHOLDER___'
+        s = html
+        # Remove the first occurrence of the explicit placeholder if present
+        s = re.sub(r'(?i)(?:<p[^>]*>\s*)?' + re.escape(marker) + r'(?:\s*</p>)?', '', s, count=1)
+        # Remove the first explicit <p> greeting anywhere near the top (within first 500 chars)
+        prefix = s[:500]
+        # Common patterns: <p>Hi Name,</p>  or plain text Hi Name,
+        greeting_patt = re.compile(r'(?is)(?:<p[^>]*>\s*)?(?:\b(?:hi|hello|dear)\b).*?(?:</p>)?')
+        # First, try to remove a greeting that is wrapped in a paragraph (<p>...</p>) so we don't leave stray closing tags
+        p_greeting = re.compile(r'(?is)(<p[^>]*>.*?(?:\b(?:hi|hello|dear)\b).*?</p>)')
+        if p_greeting.search(s[:500]):
+            s = p_greeting.sub('', s, count=1)
+        else:
+            # Fallback: remove a plain-text greeting near the top
+            s = greeting_patt.sub('', s, count=1)
+        # Also remove any remaining leading greetings anchored to the very start
+        s = re.sub(r'(?im)\A(\s*(?:<p[^>]*>\s*)?(?:hi|hello|dear).*?(?:</p>)?\s*)+', '', s)
+        if name:
+            # Remove duplicate explicit name-only lines that may occur near the top
+            # e.g., <p>Rohit Shinde Sir,</p> or <strong>Rohit Shinde</strong> Sir,
+            try:
+                name_plain = re.escape(name)
+                name_html_re = r'(?:<strong[^>]*>\s*)?' + name_plain + r'(?:\s*</strong>)?'
+                # Match name-only paragraphs, allowing different honorific spellings and unicode apostrophes
+                name_only_pattern = re.compile(rf"(?is)(?:<p[^>]*>\s*)?{name_html_re}(?:\s*(?:&nbsp;|\s)*)?(?:Sir|Ma(?:'|\u2019)am|Maam|Mam)?,?\s*(?:</p>)?")
+                # Remove obvious name-only lines from the initial prefix to avoid duplicates
+                prefix_len = min(500, len(s))
+                prefix = s[:prefix_len]
+                prefix_clean = name_only_pattern.sub('', prefix)
+                s = prefix_clean + s[prefix_len:]
+
+                # If there is another name-only paragraph *later* (not at the very start),
+                # replace that occurrence with the standardized greeting and keep the rest intact.
+                m = name_only_pattern.search(s)
+                greeting_html = f"<p style=\"{p_style}\">Hi {format_name_with_honorific(name)},</p>"
+                if m and m.start() > 10:
+                    s = s[:m.start()] + greeting_html + s[m.end():]
+                    return s
+            except Exception:
+                pass
+            # Fallback: Insert a single standardized formatted greeting at the top
+            greeting_html = f"<p style=\"{p_style}\">Hi {format_name_with_honorific(name)},</p>"
+            return greeting_html + s
+        return s
+    except Exception:
+        return html
+
 def normalize_fragment_html(content: str) -> str:
     """Ensure fragment content is wrapped into block elements with inline fallbacks so styles apply.
 
@@ -217,6 +361,10 @@ def normalize_fragment_html(content: str) -> str:
     """
     if not content:
         return ''
+
+    # Collapse consecutive leading greetings into a single one to avoid duplicate salutations
+    content = collapse_leading_greetings(content)
+
     # If already has block-level elements, just wrap
     if re.search(r'<\s*(p|div|ul|ol|table|h[1-6]|blockquote)\b', content, re.I):
         return f"<div class=\"ai-body-content\">{content}</div>"
@@ -228,7 +376,6 @@ def normalize_fragment_html(content: str) -> str:
     p_style = 'margin:0 0 12px 0;color:#1f3a5f;font-size:15px;line-height:1.7'
     paras_html = ''.join([f"<p style=\"{p_style}\">" + p.replace('\n','<br/>') + "</p>" for p in paras])
     return f"<div class=\"ai-body-content\">{paras_html}</div>"
-
 
 def has_meaningful_body(html_fragment: str, min_chars: int = 30, min_words: int = 5) -> bool:
     """Return True if the given HTML or fragment likely contains a meaningful message body.
@@ -277,6 +424,9 @@ SMTP_PORT = int(os.environ.get('SMTP_PORT', 587))
 SMTP_EMAIL = os.environ.get('SMTP_EMAIL')
 SMTP_PASSWORD = os.environ.get('SMTP_PASSWORD')
 SMTP_DEBUG = os.environ.get('SMTP_DEBUG', '0') in ('1', 'true', 'True')
+
+# Public base URL for assets (images must be accessible by recipients). Set PUBLIC_URL to your site origin, e.g. https://eduai.example
+PUBLIC_URL = os.environ.get('PUBLIC_URL', '').rstrip('/')
 
 # In-memory task tracking
 tasks = {}
@@ -497,6 +647,7 @@ def custom_send():
 
         # Prepare variables used by AI formatting
         html_body = ''  # full HTML if AI returns a complete document
+        canonical_ai_html = ''  # authoritative full HTML returned by AI (inline styles preferred)
         body_fragment = ''  # fallback fragment content
 
         # Run structure-only formatting (preserve wording, insert [[RECIPIENT_NAME]] placeholder in greetings)
@@ -511,25 +662,31 @@ def custom_send():
                     subj = user_subj if user_subj else (subj_ai or subj)
                     # Keep full_html as the preview email body
                     body_fragment = ''
-                    # For preview, substitute the first recipient's name into the placeholder so the user sees a realistic preview
+                    # Collapse repeated greetings in the AI output and substitute the first recipient's name so preview looks realistic
+                    full_html = collapse_leading_greetings(full_html)
                     try:
-                        preview_html = full_html.replace('[[RECIPIENT_NAME]]', first.get('name',''))
+                        # Replace placeholder with formatted name + honorific for preview
+                        preview_name = format_name_with_honorific(first.get('name','')) if first.get('name','') else ''
+                        preview_html = full_html.replace('[[RECIPIENT_NAME]]', preview_name)
+                        # If full_html contained 'Dear Educator' remove it when we have a real name
+                        if first.get('name',''):
+                            preview_html = re.sub(r'(?im)\bDear\s+Educator\b[\,\s]*', '', preview_html)
                     except Exception:
                         preview_html = full_html
                     html_body = preview_html
-                    # remember the canonical AI html for sending (contains [[RECIPIENT_NAME]] placeholder)
+                    # remember the canonical AI html for sending (contains [[RECIPIENT_NAME]] placeholder and inline styles per prompt)
                     canonical_ai_html = full_html
                 except Exception:
                     # fallback to structure-only formatting when full HTML generation fails
                     subj_ret, rewritten = mcustom.rewrite_body(description, recipient_name='', product_name=product_name, product_pains=product_pains, structure_only=True)
                     user_subj = request.form.get('subject')
                     subj = user_subj if user_subj else (subj_ret or subj)
-                    body_fragment = rewritten
+                    body_fragment = collapse_leading_greetings(rewritten)
             else:
                 subj_ret, rewritten = mcustom.rewrite_body(description, recipient_name='', product_name=product_name, product_pains=product_pains, structure_only=True)
                 user_subj = request.form.get('subject')
                 subj = user_subj if user_subj else (subj_ret or subj)
-                body_fragment = rewritten
+                body_fragment = collapse_leading_greetings(rewritten)
         except Exception:
             subj = request.form.get('subject') or f'Update from EduAI Hub'
             body_fragment = stylize_marketing_body(description, product_name=product_name)
@@ -550,9 +707,18 @@ def custom_send():
 
         if fragment_has_greeting:
             frag = (body_fragment or '').replace('[[RECIPIENT_NAME]]', first_name)
+            # Normalize greetings: remove duplicates and keep one formatted greeting at top
+            frag = normalize_greetings_keep_single(frag, first_name, p_style)
         else:
-            greeting_html = f"<p style=\"{p_style}\">Hi {first_name or 'Educator'},</p>"
+            # Only include a greeting if we have a name for the first recipient; do not default to 'Educator'
+            if first_name:
+                # Build a formatted greeting with bold name and gendered honorific
+                greeting_html = f"<p style=\"{p_style}\">Hi {format_name_with_honorific(first_name)},</p>"
+            else:
+                greeting_html = ''
             frag = (greeting_html + (body_fragment or '')).replace('[[RECIPIENT_NAME]]', first_name)
+            # Ensure we still normalize any stray greetings after concatenation
+            frag = normalize_greetings_keep_single(frag, first_name, p_style)
         fragment_preview = _wrap_fragment(frag)
 
         # Choose template: default or themed event template based on user selection
@@ -582,7 +748,13 @@ def custom_send():
                 event_location = request.form.get('event_location') or 'LIVE ON ZOOM'
                 cta_text = request.form.get('cta_text') or 'Register for tomorrow\'s live session'
                 cta_link = request.form.get('cta_link') or '#'
-                html_body = render_template('email_template_theme.html', recipient_name=first_name, ai_body=fragment_preview, subject=subj, title=subj, event_date=event_date, event_time=event_time, event_location=event_location, cta_text=cta_text, cta_link=cta_link, sender_name=name)
+                # Use a public logo URL when available so recipients can fetch the image; fall back to request url_for
+                try:
+                    logo_url_to_use = PUBLIC_URL + '/static/image.png' if PUBLIC_URL else url_for('static', filename='image.png', _external=True)
+                except Exception:
+                    logo_url_to_use = url_for('static', filename='image.png')
+                # Provide the event template with the logo and an exciting default banner
+                html_body = render_template('email_template_theme.html', recipient_name=first_name, ai_body=fragment_preview, subject=subj, title=subj, event_date=event_date, event_time=event_time, event_location=event_location, cta_text=cta_text, cta_link=cta_link, sender_name=name, logo_url=logo_url_to_use, banner_text=(request.form.get('banner_text') or f"🚀 {subj} — Join our LIVE webinar on {event_date or 'the scheduled date'}"), promo_remark=request.form.get('promo_remark') or 'Seats are limited — register now to secure your spot.', logo_desktop_width=(request.form.get('logo_desktop_width') or '180px'), logo_laptop_width=(request.form.get('logo_laptop_width') or '160px'), logo_tablet_width=(request.form.get('logo_tablet_width') or '140px'), logo_mobile_width=(request.form.get('logo_mobile_width') or '120px'), ai_contains_greeting=fragment_has_greeting)
             else:
                 # If user did not provide a custom structure, build a default skeleton and include fragment styles/CSS
                 if not structure_html:
@@ -612,7 +784,7 @@ def custom_send():
 
         recipient_data = '\n'.join([f"{r['email']}||{r['name']}" for r in recipients])
 
-        return render_template('preview.html', emails=[r['email'] for r in recipients], count=len(recipients), subject=subj, sender_name=name, email_html=html_body, custom_attachments='||'.join(saved), custom_mode='custom', recipient_data=recipient_data, ai_personalize='1' if ai_personalize else '0', email_fragment=body_fragment, use_ai='1' if use_ai else '0', template=template_name, cta_text=cta_text if template_name=='event' else '', cta_link=cta_link if template_name=='event' else '', event_date=event_date if template_name=='event' else '', event_time=event_time if template_name=='event' else '', event_location=event_location if template_name=='event' else '', structure_html=structure_html, structure_css=structure_css)
+        return render_template('preview.html', emails=[r['email'] for r in recipients], count=len(recipients), subject=subj, sender_name=name, email_html=html_body, custom_attachments='||'.join(saved), custom_mode='custom', recipient_data=recipient_data, ai_personalize='1' if ai_personalize else '0', email_fragment=body_fragment, use_ai='1' if use_ai else '0', template=template_name, cta_text=cta_text if template_name=='event' else '', cta_link=cta_link if template_name=='event' else '', event_date=event_date if template_name=='event' else '', event_time=event_time if template_name=='event' else '', event_location=event_location if template_name=='event' else '', structure_html=structure_html, structure_css=structure_css, canonical_ai_html=canonical_ai_html)
     finally:
         # keep tempdirs for confirm step; cleanup after sending
         pass
@@ -649,7 +821,14 @@ def custom_start_send():
     # Prevent accidental sends when the formatted message lacks a real body
     # (e.g., only contains header/footer or is empty). Require the user to
     # edit/confirm the message in the preview first.
-    if email_fragment:
+    # Prefer canonical AI HTML if available
+    canonical_ai_html = request.form.get('canonical_ai_html') or ''
+    if canonical_ai_html:
+        if not has_meaningful_body(canonical_ai_html):
+            logging.warning('Blocked send: canonical AI HTML rejected by validation. HTML snippet: %s', canonical_ai_html[:300])
+            flash('Message appears to be empty or contains only a greeting/header/footer. Please add more content to your message (at least 5 words of body text).', 'warning')
+            return redirect(url_for('custom_form'))
+    elif email_fragment:
         if not has_meaningful_body(email_fragment):
             logging.warning('Blocked send: fragment rejected by validation. Fragment: %s', email_fragment[:300])
             flash('Message appears to be empty or contains only a greeting/header/footer. Please add more content to your message (at least 5 words of body text).', 'warning')
@@ -695,8 +874,10 @@ def custom_start_send():
     # read structure HTML/CSS passed from preview (may be empty)
     structure_html = request.form.get('structure_html') or ''
     structure_css = request.form.get('structure_css') or ''
+    # read the canonical AI full HTML returned by OpenAI (passed through preview hidden input)
+    canonical_ai_html = request.form.get('canonical_ai_html') or ''
 
-    thread = threading.Thread(target=send_custom_task, args=(task_id, recipients, subject, sender_name, attachments, email_html, ai_personalize, use_ai, use_ai_structure, description, email_fragment, fragment_has_greeting, product_key, product_name, product_pains, template_name, cta_text, cta_link, event_date, event_time, event_location, structure_html, structure_css), daemon=True)
+    thread = threading.Thread(target=send_custom_task, args=(task_id, recipients, subject, sender_name, attachments, email_html, ai_personalize, use_ai, use_ai_structure, description, email_fragment, fragment_has_greeting, product_key, product_name, product_pains, template_name, cta_text, cta_link, event_date, event_time, event_location, structure_html, structure_css, canonical_ai_html), daemon=True)
     thread.start()
     flash('Customized emails queued for sending (check progress).', 'success')
     return redirect(url_for('progress', task_id=task_id))
@@ -716,11 +897,16 @@ def send_preview():
 
     # Use the same send helper so behavior matches the normal send path
     try:
-        # inline CSS for sending to ensure it matches preview rendering in most clients
-        if PREMAILER_AVAILABLE:
-            send_html = inline_css(email_html, keep_style_tags=True)
+        # Prefer canonical AI html if present (it should already include inline styles)
+        canonical_ai_html = request.form.get('canonical_ai_html') or ''
+        if canonical_ai_html:
+            send_html = canonical_ai_html
         else:
-            send_html = email_html
+            # inline CSS for sending to ensure it matches preview rendering in most clients
+            if PREMAILER_AVAILABLE:
+                send_html = inline_css(email_html, keep_style_tags=True)
+            else:
+                send_html = email_html
 
         results = send_bulk_emails([test_email], subj, send_html, sender_display=sender_name)
         if results.get('failed'):
@@ -734,7 +920,7 @@ def send_preview():
     return redirect(request.referrer or url_for('dashboard'))
 
 
-def send_custom_task(task_id, recipients, subject, sender_display=None, attachments=None, body_html=None, ai_personalize=False, use_ai=False, use_ai_structure=False, description='', body_fragment='', fragment_has_greeting=False, product_key=None, product_name=None, product_pains=None, template_name='', cta_text='', cta_link='', event_date='', event_time='', event_location='', structure_html='', structure_css=''):
+def send_custom_task(task_id, recipients, subject, sender_display=None, attachments=None, body_html=None, ai_personalize=False, use_ai=False, use_ai_structure=False, description='', body_fragment='', fragment_has_greeting=False, product_key=None, product_name=None, product_pains=None, template_name='', cta_text='', cta_link='', event_date='', event_time='', event_location='', structure_html='', structure_css='', canonical_ai_html=''):
     """Send emails using the EXACT preview HTML with per-recipient name personalization.
     
     The preview HTML (body_html) is the authoritative template. We personalize it per recipient
@@ -808,7 +994,9 @@ def send_custom_task(task_id, recipients, subject, sender_display=None, attachme
                 # Render the full template from this fragment and fully inline CSS for sending
                 with app.app_context():
                     if template_name == 'event':
-                        generic_html = render_template('email_template_theme.html', recipient_name='', ai_body=frag_for_send, subject=subject, title=subject, event_date=event_date, event_time=event_time, event_location=event_location, cta_text=cta_text or 'Register', cta_link=cta_link or '#', sender_name=sender_display, footer_text='Solving complex business problems with intelligent automation solutions')
+                        # Use PUBLIC_URL when available so recipients can fetch the logo; fall back to relative path
+                        logo_url_to_use = (PUBLIC_URL + '/static/image.png') if PUBLIC_URL else '/static/image.png'
+                        generic_html = render_template('email_template_theme.html', recipient_name='', ai_body=frag_for_send, subject=subject, title=subject, event_date=event_date, event_time=event_time, event_location=event_location, cta_text=cta_text or 'Register', cta_link=cta_link or '#', sender_name=sender_display, footer_text='EduAI Hub ©2026', logo_url=logo_url_to_use, banner_text=(f"🚀 {subject} — Join our LIVE webinar on {event_date or 'the scheduled date'}"), promo_remark='Seats are limited — register now to secure your spot.', logo_desktop_width='180px', logo_laptop_width='160px', logo_tablet_width='140px', logo_mobile_width='120px', ai_contains_greeting=suppress)
                     elif not structure_html:
                         # No user skeleton provided — build default skeleton on the backend and inline CSS for sending
                         generated_structure_html, generated_structure_css = build_default_structure(frag_for_send, subject=subject, sender_name=sender_display)
@@ -817,6 +1005,57 @@ def send_custom_task(task_id, recipients, subject, sender_display=None, attachme
                         generic_html = render_template('email_template_custom.html', recipient_name='', ai_hook='', ai_body=frag_for_send, suppress_greeting=suppress)
                     if PREMAILER_AVAILABLE:
                         generic_html = inline_css(generic_html, keep_style_tags=False)
+        elif canonical_ai_html:
+            # Prefer using the canonical AI-produced full HTML (assumed to have inline styles)
+            generic_html = canonical_ai_html
+            # replace literal recipient name instances with the internal marker when possible
+            if first_recipient_name:
+                generic_html = generic_html.replace(f"Hi {first_recipient_name},", f"Hi {greeting_marker},")
+                generic_html = generic_html.replace(f"Dear {first_recipient_name},", f"Dear {greeting_marker},")
+                generic_html = generic_html.replace(f"Hello {first_recipient_name},", f"Hello {greeting_marker},")
+                generic_html = generic_html.replace(f"Hi&nbsp;{first_recipient_name},", f"Hi&nbsp;{greeting_marker},")
+                generic_html = generic_html.replace(f"Dear&nbsp;{first_recipient_name},", f"Dear&nbsp;{greeting_marker},")
+            # Ensure placeholder token is normalized to marker
+            generic_html = generic_html.replace('[[RECIPIENT_NAME]]', greeting_marker)
+            # normalize plain greetings and variants that include honorifics (Sir, Ma'am, Mam, Maam) when a first recipient name is available
+            if first_recipient_name:
+                generic_html = generic_html.replace(f"Hi {first_recipient_name},", f"Hi {greeting_marker},")
+                generic_html = generic_html.replace(f"Hi {first_recipient_name} Sir,", f"Hi {greeting_marker},")
+                generic_html = generic_html.replace(f"Hi {first_recipient_name} Ma'am,", f"Hi {greeting_marker},")
+                generic_html = generic_html.replace(f"Hi {first_recipient_name} Ma'am,", f"Hi {greeting_marker},")
+                generic_html = generic_html.replace(f"Hi {first_recipient_name} Ma\u2019am,", f"Hi {greeting_marker},")
+                generic_html = generic_html.replace(f"Hi {first_recipient_name} Maam,", f"Hi {greeting_marker},")
+                generic_html = generic_html.replace(f"Hi {first_recipient_name} Mam,", f"Hi {greeting_marker},")
+                # also support right-single-quote variant (curly) used by some models
+                generic_html = generic_html.replace(f"Hi {first_recipient_name} Ma\u2019am,", f"Hi {greeting_marker},")
+                generic_html = generic_html.replace(f"Dear {first_recipient_name},", f"Dear {greeting_marker},")
+                generic_html = generic_html.replace(f"Hello {first_recipient_name},", f"Hello {greeting_marker},")
+                generic_html = generic_html.replace(f"Hi&nbsp;{first_recipient_name},", f"Hi&nbsp;{greeting_marker},")
+                generic_html = generic_html.replace(f"Hi&nbsp;{first_recipient_name}&nbsp;Sir,", f"Hi&nbsp;{greeting_marker},")
+                generic_html = generic_html.replace(f"Hi&nbsp;{first_recipient_name}&nbsp;Ma'am,", f"Hi&nbsp;{greeting_marker},")
+                generic_html = generic_html.replace(f"Dear&nbsp;{first_recipient_name},", f"Dear&nbsp;{greeting_marker},")
+            # If we used the local static logo path, convert it to a public absolute URL when configured
+            try:
+                if PUBLIC_URL:
+                    generic_html = generic_html.replace('src="/static/image.png"', f'src="{PUBLIC_URL}/static/image.png"')
+                    generic_html = generic_html.replace("src='/static/image.png'", f"src='{PUBLIC_URL}/static/image.png'")
+            except Exception:
+                logging.exception('Failed to rewrite logo URL in canonical AI HTML')
+
+            # Ensure the HTML contains a logo at the very top — if AI output lacks one, inject our branded header.
+            try:
+                # Look for common logo indicators
+                has_logo = bool(re.search(r'src=["\'](?:[^"\']*image\.png|cid:eduai_logo|eduaihub|logo)["\']', generic_html, flags=re.I)) or ('<img' in generic_html.lower() and 'logo' in generic_html.lower())
+                if not has_logo:
+                    logo_url_to_use = (PUBLIC_URL + '/static/image.png') if PUBLIC_URL else '/static/image.png'
+                    header_snippet = f'<div style="text-align:center;padding:12px;"><img src="{logo_url_to_use}" alt="EduAI Hub" style="max-width:200px;height:auto;display:block;margin:0 auto;"/></div>'
+                    # Insert right after <body> if present, otherwise prepend
+                    if re.search(r'(?is)<body[^>]*>', generic_html):
+                        generic_html = re.sub(r'(?is)(<body[^>]*>)', r"\1" + header_snippet, generic_html, count=1)
+                    else:
+                        generic_html = header_snippet + generic_html
+            except Exception:
+                logging.exception('Failed to inject fallback logo into canonical AI HTML')
         elif body_html:
             # Fallback: try to produce a generic version by replacing the first recipient's name if present
             generic_html = body_html
@@ -834,15 +1073,27 @@ def send_custom_task(task_id, recipients, subject, sender_display=None, attachme
 
         for r in recipients:
             email = r.get('email')
-            name = r.get('name') or 'Educator'
+            name = r.get('name') or ''
+            # Normalize name to None/empty-string (do not fallback to Educator) and strip whitespace
+            name = name.strip() if name and isinstance(name, str) else ''
             try:
                 # Ensure any [[RECIPIENT_NAME]] placeholders are converted to our internal marker
                 generic_html = generic_html.replace('[[RECIPIENT_NAME]]', greeting_marker)
-                # Personalize the generic HTML for this recipient
-                final_html = generic_html.replace(greeting_marker, name)
+                # Personalize the generic HTML for this recipient; if name missing, remove the greeting entirely
+                if name:
+                    formatted = format_name_with_honorific(name)
+                    final_html = generic_html.replace(greeting_marker, formatted)
+                    # Also remove any 'Dear Educator' generic greetings when personalizing
+                    final_html = re.sub(r'(?im)\bDear\s+Educator\b[\,\s]*', '', final_html)
+                else:
+                    # Remove any greeting lines that reference the internal marker
+                    final_html = re.sub(r'(?i)(?:<p[^>]*>\s*)?(?:hi|hello|dear)\s*(?:&nbsp;|\s)+___RECIPIENT_NAME_PLACEHOLDER___,?\s*(?:</p>)?', '', generic_html)
                 use_subj = subject
                 
                 logging.info('Sending preview-based email to %s with personalized greeting for %s', email, name)
+
+                # Collapse and format any leading greetings so we never end up with duplicates
+                final_html = collapse_and_format_leading_greetings(final_html, name, p_style)
 
                 # Defensive check: ensure final_html contains meaningful body before sending
                 if not has_meaningful_body(final_html):
@@ -855,12 +1106,23 @@ def send_custom_task(task_id, recipients, subject, sender_display=None, attachme
                         logging.exception('Failed to log skipped empty body')
                     continue
 
+                # Replace any static logo references with CID and attach the inline image if available
+                inline_images = None
+                try:
+                    logo_path = os.path.join(app.root_path, 'static', 'image.png')
+                    if os.path.exists(logo_path):
+                        final_html = re.sub(r'src=["\'](?:https?:\/\/[^"\']+)?\/static\/image\.png["\']', 'src="cid:eduai_logo"', final_html, flags=re.I)
+                        inline_images = [(logo_path, 'eduai_logo')]
+                except Exception:
+                    logging.exception('Logo inline handling failed')
+
                 # Log a short debug snippet of the HTML actually being sent to help diagnose missing-body issues
                 try:
                     logging.debug('Sending to %s: subject=%s, html_len=%s, html_snippet=%s', email, use_subj, len(final_html) if final_html else 0, (final_html or '')[:300].replace('\n', ' '))
                 except Exception:
                     pass
-                ok, err = mutils.send_email_with_attachments(email, use_subj, final_html, attachments=attachments or None, sender_name=sender_display)
+
+                ok, err = mutils.send_email_with_attachments(email, use_subj, final_html, attachments=attachments or None, inline_images=inline_images, sender_name=sender_display)
                 if ok:
                     with tasks_lock:
                         tasks[task_id]['sent'] += 1
@@ -1009,7 +1271,7 @@ def greetings_send():
                     fallback_text = f"Struggling with {', '.join([p.split()[0] for p in product_pains[:2]])}? {pains_snippet} Try EduAIHub's tools to save time."
                 else:
                     fallback_text = "Struggling with lesson planning and grading? Try EduAIHub's tools to save hours."
-                body_fragment = stylize_marketing_body(fallback_text, product_name=product_name)
+                body_fragment = collapse_leading_greetings(stylize_marketing_body(fallback_text, product_name=product_name))
                 # use market template if available
                 tmpl = f"email_template_{market_class}.html" if market_class else 'email_template_greeting.html'
                 try:
@@ -1033,11 +1295,11 @@ def greetings_send():
                     # If subject not provided by user, use AI subject suggestion
                     if not subject and subj_ai:
                         subject = subj_ai
-                    body_fragment = rewritten
+                    body_fragment = collapse_leading_greetings(rewritten)
                 except Exception as e:
                     logging.exception('AI rewrite failed; falling back to local stylize')
                     flash('AI rewrite failed; using local stylize instead.', 'warning')
-                    body_fragment = stylize_marketing_body(body, product_name=product_key and PRODUCTS.get(product_key, {}).get('name'))
+                    body_fragment = collapse_leading_greetings(stylize_marketing_body(body, product_name=product_key and PRODUCTS.get(product_key, {}).get('name')))
             else:
                 body_fragment = stylize_marketing_body(body, product_name=product_key and PRODUCTS.get(product_key, {}).get('name'))
 
@@ -1057,7 +1319,7 @@ def greetings_send():
         # Build recipient_data hidden payload (email||name per line)
         recipient_data = '\n'.join([f"{r['email']}||{r['name']}" for r in recipients])
 
-        return render_template('preview.html', emails=[r['email'] for r in recipients], count=len(recipients), subject=subject, sender_name='EduAI', email_html=body_html, greeting_mode='greeting', greeting_kind=kind, custom_attachments='||'.join(attach_paths), recipient_data=recipient_data, email_fragment=body_fragment, structure_html='', structure_css='')
+        return render_template('preview.html', emails=[r['email'] for r in recipients], count=len(recipients), subject=subject, sender_name='EduAI', email_html=body_html, greeting_mode='greeting', greeting_kind=kind, custom_attachments='||'.join(attach_paths), recipient_data=recipient_data, email_fragment=body_fragment, structure_html='', structure_css='', canonical_ai_html='')
     finally:
         # Note: we keep attach_tmp and tempdir alive for the confirm step; they will be cleaned up after sending
         pass
@@ -1225,7 +1487,7 @@ def index():
             email_html = inline_css(email_html, keep_style_tags=True)
         else:
             flash('Premailer not installed — styles may not appear in some email clients. Install with `pip install premailer`.', 'warning')
-        return render_template('preview.html', emails=emails, count=len(emails), subject=subject, sender_name=sender_name or '', email_html=email_html, intro=intro, structure_html='', structure_css='')    
+        return render_template('preview.html', emails=emails, count=len(emails), subject=subject, sender_name=sender_name or '', email_html=email_html, intro=intro, structure_html='', structure_css='', canonical_ai_html='')    
     return render_template('index.html')
 
 
@@ -1330,7 +1592,7 @@ def product_sender():
             email_html = inline_css(email_html, keep_style_tags=True)
         else:
             flash('Premailer not installed — styles may not appear in some email clients. Install with `pip install premailer`.', 'warning')
-        return render_template('preview.html', emails=emails, count=len(emails), subject=subject, sender_name=sender_name or '', email_html=email_html, product_key=product_key, custom_note=custom_note, product_name=product['name'], structure_html='', structure_css='')
+        return render_template('preview.html', emails=emails, count=len(emails), subject=subject, sender_name=sender_name or '', email_html=email_html, product_key=product_key, custom_note=custom_note, product_name=product['name'], structure_html='', structure_css='', canonical_ai_html='')
     return render_template('product_send.html')
 
 

@@ -87,8 +87,8 @@
                 <!-- Pass any user-provided structure/css through as well -->
                 <input type="hidden" name="structure_html" value="{{ structure_html|e if structure_html else '' }}">
                 <input type="hidden" name="structure_css" value="{{ structure_css|e if structure_css else '' }}">
-
-                <hr />
+                <!-- If AI returned a canonical full HTML, pass it through for the send step -->
+                <input type="hidden" name="canonical_ai_html" value="{{ canonical_ai_html|e if canonical_ai_html else '' }}">
                 <div class="mt-2">
                   <form id="sendPreviewForm" method="post" action="/send-preview" class="row g-2 align-items-center">
                     <div class="col-auto">
@@ -100,7 +100,8 @@
                     </div>
                     <input type="hidden" name="subject" value="{{ subject }}">
                     <input type="hidden" name="sender_name" value="{{ sender_name }}">
-                    <textarea name="email_html" style="display:none;">{{ email_html|e }}</textarea>
+                    <input type="hidden" name="canonical_ai_html" value="{{ canonical_ai_html|e if canonical_ai_html else '' }}">
+                    <textarea name="email_html" style="display:none;">{% if canonical_ai_html %}{{ canonical_ai_html }}{% else %}{{ email_html }}{% endif %}</textarea>
                     <div class="col-auto">
                       <button id="sendPreviewBtn" class="btn btn-outline-primary" type="submit">Send preview</button>
                     </div>
@@ -166,7 +167,11 @@
             <div class="card-body">
               <h5>Email Preview</h5>
               <div style="border:1px solid #ddd;padding:10px;max-height:600px;overflow:auto;">
-                {{ email_html|safe }}
+                {% if canonical_ai_html %}
+                  {{ canonical_ai_html|safe }}
+                {% else %}
+                  {{ email_html|safe }}
+                {% endif %}
               </div>
             </div>
           </div>

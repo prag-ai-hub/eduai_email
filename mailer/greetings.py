@@ -24,14 +24,14 @@ def generate_greeting(kind, recipient_name, description, product_name=None, prod
 
     if kind == 'invitation':
         prompt = (
-            f"Write a professional invitation email. Recipient: {recipient_name if recipient_name else 'Educator'}. "
-            f"Meeting details: {description}\n"
-            f"{pains_ctx}\n"
-            f"Format your response as:\n"
-            f"Subject: <subject>\n"
-            f"Hook: <compelling one-liner>\n"
-            f"Greeting: <1-2 sentences greeting paragraph>\n"
-            f"Main Body: <2-3 paragraphs with meeting details, purpose, and next steps>\n"
+            ((f"Write a professional invitation email. Recipient: {recipient_name}. " if recipient_name else "Write a professional invitation email. ") +
+            f"Meeting details: {description}\n") +
+            f"{pains_ctx}\n" +
+            f"Format your response as:\n" +
+            f"Subject: <subject>\n" +
+            f"Hook: <compelling one-liner>\n" +
+            f"Greeting: <1-2 sentences greeting paragraph>\n" +
+            f"Main Body: <2-3 paragraphs with meeting details, purpose, and next steps>\n" +
             f"Closing: <1 sentence closing paragraph with call to action>"
         )
     elif kind == 'thankyou':

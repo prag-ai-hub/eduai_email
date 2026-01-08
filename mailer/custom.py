@@ -21,11 +21,12 @@ def generate_custom_email(recipient_name, description, product_name=None, produc
     if product_name and product_pains:
         pains_text = f"Product: {product_name}. Known pains: {', '.join(product_pains)}."
 
+    recipient_line = f"Recipient name: {recipient_name}.\n" if recipient_name else ""
     prompt = (
         f"You are a professional marketing copywriter for {company_name}.\n"
         f"Use a pain-first marketing approach: start by describing the key problems or pain points the recipient faces (use the product pains if provided), then present the product benefits as direct solutions to those problems.\n"
         f"Produce a short subject line (one sentence), a one-line compelling hook (ideally pain-oriented), and an HTML body section (no full html page) suitable to embed into an existing email template.\n"
-        f"Recipient name: {recipient_name if recipient_name else 'Educator'}.\n"
+        f"{recipient_line}"
         f"{pains_text}\n"
         f"Context / description: {description}\n"
         "Respond with the format:\nSubject: <subject>\nHook: <short hook>\nBody:\n<html>...</html>\n"
@@ -103,11 +104,14 @@ def generate_custom_email(recipient_name, description, product_name=None, produc
 
 
 def generate_full_html(raw_body: str, subject: str | None = None, recipient_name: str = '', product_name: str | None = None, product_pains=None, company_name='EduAIHub') -> tuple:
-    """Ask OpenAI to return a full, stylized HTML email (complete <html> doc).
+    """Produce a full, stylized HTML email from user content.
 
-    - Preserves the user's wording and meaning (do NOT paraphrase).
-    - Wraps content in an email-friendly template (table-based), includes <style> blocks and inline-friendly CSS.
-    - Replaces any recipient greeting name with [[RECIPIENT_NAME]] so personalization works.
+    Steps:
+      - Ask OpenAI to return a full <html> document with inline styles for critical elements.
+      - If the response is not a full HTML doc, perform a repair pass asking the model to convert the output to a full HTML doc.
+      - Ensure the [[RECIPIENT_NAME]] placeholder appears in greetings for personalization.
+      - Attempt to inline CSS using premailer when available as a final safety step.
+
     Returns (subject_suggested_or_given, full_html_document)
     """
     if not openai or not getattr(openai, 'api_key', None):
@@ -118,17 +122,14 @@ def generate_full_html(raw_body: str, subject: str | None = None, recipient_name
         pains_text = f"Product: {product_name}. Known pains: {', '.join(product_pains)}."
 
     prompt = (
-        f"You are an expert email designer and formatter for {company_name}.\n"
-        "Do NOT change the user's words or meaning — only format and wrap the content into a complete, responsive HTML email suitable for educational audiences (teachers, school staff).\n"
-        "Requirements:\n"
-        " - Produce a full HTML document (<html>...</html>) with a table-based email-friendly layout and a <style> block for visual polish.\n"
-        " - Add inline styles to primary elements when practical (buttons, main sections), so the email degrades gracefully when <style> is stripped.\n"
-        " - Use bright, school-themed colors and playful but professional animations (simple keyframes), but keep animations subtle and non-intrusive.\n"
-        " - Replace any recipient names in greetings with the exact token [[RECIPIENT_NAME]] so the sending code can personalize per recipient.\n"
-        " - Keep links and images exactly as provided. Do not add external images unless included in the original text.\n"
-        f"Recipient name: {recipient_name if recipient_name else 'Educator'}. {pains_text}\n"
-        "Original content (do not paraphrase):\n" + raw_body + "\n"
-        "Respond with only the full HTML document. Do not include any commentary or markdown fences.\n"
+        f"You are an expert email designer and formatter for {company_name}.\n" +
+        "Do NOT change the user's words or meaning — only format and wrap the content into a complete, responsive HTML email suitable for educational audiences (teachers, school staff).\n" +
+        "STRICT: Return only a full HTML document (<html>...</html>) and nothing else.\n" +
+        "Inline critical styles on primary elements (buttons, headers, paragraphs) — you may include a small <style> block for enhancements, but the email must render correctly using inline styles alone.\n" +
+        "Use a table-based container for the main email body and include a short, clear CTA. Replace any recipient names in greetings with the token [[RECIPIENT_NAME]].\n" +
+        ((f"Recipient name: {recipient_name}.\n" if recipient_name else "") + (f"{pains_text}\n" if pains_text else "")) +
+        "Original content (do not paraphrase):\n" + raw_body + "\n" +
+        "Return only the full HTML document (prefer inline styles).\n"
     )
 
     def _chat_complete(messages, model='gpt-3.5-turbo', **kwargs):
@@ -137,10 +138,29 @@ def generate_full_html(raw_body: str, subject: str | None = None, recipient_name
         except Exception:
             return openai.chat.completions.create(model=model, messages=messages, **kwargs)
 
-    resp = _chat_complete([{'role': 'system', 'content': 'You produce clean HTML emails.'}, {'role': 'user', 'content': prompt}], max_tokens=800, temperature=0.35)
+    # First attempt
+    resp = _chat_complete([{'role': 'system', 'content': 'You produce strict, usable HTML emails.'}, {'role': 'user', 'content': prompt}], max_tokens=1000, temperature=0.2)
     text = resp.choices[0].message.content.strip()
 
-    # If model returned subject line at top, pull it out
+    # If not a full HTML document, ask the model to convert the output into one
+    if not re.search(r'<\s*html\b|<\s*body\b|<\s*table\b', text, re.I):
+        repair_prompt = (
+            "The previous response did not include a full HTML document.\n"
+            "Please convert the following content into a complete, responsive HTML email document and inline critical styles on primary elements.\n"
+            "Do NOT paraphrase — only format and wrap the content as requested.\n"
+            "Content:\n" + text + "\nReturn only the full HTML document.\n"
+        )
+        try:
+            resp2 = _chat_complete([{'role': 'system', 'content': 'You produce strict, usable HTML emails.'}, {'role': 'user', 'content': repair_prompt}], max_tokens=1000, temperature=0.0)
+            text = resp2.choices[0].message.content.strip()
+        except Exception:
+            # Fallback: wrap plaintext minimally
+            p_style = 'margin:0 0 12px 0; font-size:15px; color:#234b38; line-height:1.6'
+            paras = [p.strip() for p in re.split(r'\n{2,}|\r\n{2,}', raw_body) if p.strip()]
+            body_html = ''.join(["<p style=\"" + p_style + "\">" + p.replace('\n','<br/>') + "</p>" for p in paras])
+            text = f"<html><head><meta charset=\"utf-8\"></head><body><table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\"><tr><td>{body_html}</td></tr></table></body></html>"
+
+    # Extract subject if model included one
     subj_out = subject or ''
     lines = text.splitlines()
     if lines and lines[0].lower().startswith('subject:'):
@@ -149,12 +169,20 @@ def generate_full_html(raw_body: str, subject: str | None = None, recipient_name
     else:
         html_text = text
 
-    # Heuristic cleanup: remove leading/trailing instruction echoes
-    html_text = re.sub(r'(?i)^```html\s*', '', html_text)
-    html_text = re.sub(r'(?i)```\s*$', '', html_text)
-
     # Ensure recipient placeholder exists
-    html_text = re.sub(r'(?im)(^\s*(hi|hello|dear)\s+)([^\n,]{1,80})(,?)', lambda m: f"{m.group(1)}[[RECIPIENT_NAME]]{m.group(4) or ','}", html_text)
+    if '[[RECIPIENT_NAME]]' not in html_text:
+        html_text = re.sub(r'(?im)(^\s*(hi|hello|dear)\s+)([^\n,]{1,80})(,?)', lambda m: f"{m.group(1)}[[RECIPIENT_NAME]]{m.group(4) or ','}", html_text)
+
+    # Try inlining styles when premailer is available to reinforce the guarantee
+    try:
+        from premailer import transform as _premailer_transform
+        try:
+            html_inlined = _premailer_transform(html_text, remove_classes=True, keep_style_tags=False)
+            html_text = html_inlined
+        except Exception:
+            pass
+    except Exception:
+        pass
 
     return subj_out, html_text
 
@@ -249,12 +277,11 @@ def rewrite_body(raw_body: str, recipient_name: str = '', product_name: str | No
             return '', _local_structure_format(raw_body_sanitized)
 
     prompt = (
-        f"You are a professional marketing copywriter for {company_name}.\n"
-        "Rewrite the following message into a concise, pain-first marketing email body suitable to embed into an existing email template. "
-        "Start with a short, bold problem statement (one sentence), then 1-2 short paragraphs describing benefits and a single clear call to action. Keep paragraphs short, suitable for email. Preserve any links provided. Output only a subject line then the HTML fragment.\n"
-        f"Recipient name: {recipient_name if recipient_name else 'Educator'}.\n"
-        f"{pains_text}\n"
-        "Original content:\n" + raw_body + "\n"
+        f"You are a professional marketing copywriter for {company_name}.\n" +
+        "Rewrite the following message into a concise, pain-first marketing email body suitable to embed into an existing email template. " +
+        "Start with a short, bold problem statement (one sentence), then 1-2 short paragraphs describing benefits and a single clear call to action. Keep paragraphs short, suitable for email. Preserve any links provided. Output only a subject line then the HTML fragment.\n" +
+        ((f"Recipient name: {recipient_name}.\n" if recipient_name else "") + (f"{pains_text}\n" if pains_text else "")) +
+        "Original content:\n" + raw_body + "\n" +
         "Respond with the format:\nSubject: <subject>\nBody:\n<html>...</html>\n"
     )
 
